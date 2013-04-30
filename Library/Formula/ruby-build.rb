@@ -2,21 +2,16 @@ require 'formula'
 
 class RubyBuild < Formula
   homepage 'https://github.com/sstephenson/ruby-build'
-  url 'https://github.com/sstephenson/ruby-build/tarball/v20121201'
-  sha1 '2376fe7cc68eb6cfdd2cb8b7f9319cb7795a40a0'
+  url 'https://github.com/sstephenson/ruby-build/archive/v20130408.tar.gz'
+  sha1 '238d3bc25576fa5201fc160e9179f419b0c6a3bd'
 
   head 'https://github.com/sstephenson/ruby-build.git'
 
-  option "without-rbenv", "Don't install as an rbenv plugin"
-
-  depends_on 'rbenv' unless build.include? 'without-rbenv'
+  depends_on 'autoconf' => :recommended
+  depends_on 'pkg-config' => :recommended
 
   def install
     ENV['PREFIX'] = prefix
     system "./install.sh"
-
-    rbenv_plugins = "#{HOMEBREW_PREFIX}/var/lib/rbenv/plugins"
-    mkdir_p rbenv_plugins
-    ln_sf opt_prefix, "#{rbenv_plugins}/#{name}" unless build.include? 'without-rbenv'
   end
 end

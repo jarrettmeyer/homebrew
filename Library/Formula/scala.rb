@@ -2,14 +2,8 @@ require 'formula'
 
 class ScalaDocs < Formula
   homepage 'http://www.scala-lang.org/'
-  url 'http://www.scala-lang.org/downloads/distrib/files/scala-docs-2.9.2.zip'
-  sha1 'b49ef500314d968ddbd683b64628925a747f35e5'
-
-  devel do
-    url 'http://www.scala-lang.org/downloads/distrib/files/scala-docs-2.10.0-RC3.zip'
-    sha1 'b3f5a95e2256a059087c95d49573550feff78ff6'
-  end
-
+  url 'http://www.scala-lang.org/downloads/distrib/files/scala-docs-2.10.1.zip'
+  sha1 '7ff73776f7af9d6b2d5081a3a6ffa2a442640a59'
 end
 
 class ScalaCompletion < Formula
@@ -21,14 +15,8 @@ end
 
 class Scala < Formula
   homepage 'http://www.scala-lang.org/'
-  url 'http://www.scala-lang.org/downloads/distrib/files/scala-2.9.2.tgz'
-  sha1 '806fc1d91bda82d6a584172d7742531386ae68fb'
-
-  devel do
-    url 'http://www.scala-lang.org/downloads/distrib/files/scala-2.10.0-RC3.tgz'
-    sha1 '0974a762aff8206ff6fd9e59094f86a1c19b76ae'
-    version '2.10.0-RC3'
-  end
+  url 'http://www.scala-lang.org/downloads/distrib/files/scala-2.10.1.tgz'
+  sha1 '589cc2ba688510f2ec169837b44be5db9fd538b6'
 
   option 'with-docs', 'Also install library documentation'
 

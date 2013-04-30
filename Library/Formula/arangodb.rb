@@ -2,29 +2,43 @@ require 'formula'
 
 class Arangodb < Formula
   homepage 'http://www.arangodb.org/'
-  url 'https://github.com/triAGENS/ArangoDB/zipball/v1.0.4'
-  sha1 'c443cd9703055ffde0180c6a8f4dd221f6b081ac'
+  url 'https://github.com/triAGENS/ArangoDB/archive/v1.2.3.tar.gz'
+  sha1 '14e77ce4c8fa0b55b371dee06d8ccf0edef5ba68'
 
-  head "https://github.com/triAGENS/ArangoDB.git"
+  head "https://github.com/triAGENS/ArangoDB.git", :branch => 'unstable'
 
   devel do
-    url 'https://github.com/triAGENS/ArangoDB/zipball/v1.1.beta2'
-    sha1 '9cce97cd7fabf1db9612f508c782c7a9b17448a6'
+    version "1.3.0-alpha2"
+    url 'https://github.com/triAGENS/ArangoDB/archive/v1.3.0-alpha2.tar.gz'
+    sha1 '058c0edcba0d2e79c95b41ca2d717296d77dd9be'
   end
 
+  depends_on 'icu4c'
   depends_on 'libev'
   depends_on 'v8'
 
   def install
-    system "./configure", "--disable-debug",
-                          "--disable-dependency-tracking",
-                          "--prefix=#{prefix}",
-                          "--disable-relative",
-                          "--disable-all-in-one",
-                          "--enable-mruby",
-                          "--datadir=#{share}",
-                          "--localstatedir=#{var}"
+    args = %W[
+      --disable-dependency-tracking
+      --prefix=#{prefix}
+      --disable-relative
+      --disable-all-in-one-icu
+      --disable-all-in-one-libev
+      --disable-all-in-one-v8
+      --enable-mruby
+      --datadir=#{share}
+      --localstatedir=#{var}
+    ]
 
+    if build.devel?
+      args << "--program-suffix=-#{version}"
+    end
+
+    if build.head?
+      args << "--program-suffix=-unstable"
+    end
+
+    system "./configure", *args
     system "make install"
 
     (var+'arangodb').mkpath
@@ -34,13 +48,25 @@ class Arangodb < Formula
   plist_options :manual => "#{HOMEBREW_PREFIX}/opt/arangodb/sbin/arangod"
 
   def caveats; <<-EOS.undent
-    Please note that this is a very early version if ArangoDB. There will be
-    bugs and the ArangoDB team would really appreciate it if you report them:
+    ArangoDB (http://www.arangodb.org)
+      A universal open-source database with a flexible data model for documents,
+      graphs, and key-values.
 
-      https://github.com/triAGENS/ArangoDB/issues
+    First Steps with ArangoDB:
+      http:/www.arangodb.org/quickstart
 
-    To start the ArangoDB shell, run:
-        arangosh
+    Upgrading ArangoDB:
+      http://www.arangodb.org/manuals/1.2/Upgrading.html
+
+    Configuration file:
+      /usr/local/etc/arangodb/arangod.conf
+
+    Start ArangoDB server:
+      unix> /usr/local/sbin/arangod
+
+    Start ArangoDB shell client (use empty password):
+      unix> /usr/local/bin/arangosh
+
     EOS
   end
 
@@ -61,8 +87,6 @@ class Arangodb < Formula
         </array>
         <key>RunAtLoad</key>
         <true/>
-        <key>UserName</key>
-        <string>#{`whoami`.chomp}</string>
       </dict>
     </plist>
     EOS

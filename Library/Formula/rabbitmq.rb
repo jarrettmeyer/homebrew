@@ -2,8 +2,8 @@ require 'formula'
 
 class Rabbitmq < Formula
   homepage 'http://www.rabbitmq.com'
-  url 'http://www.rabbitmq.com/releases/rabbitmq-server/v3.0.0/rabbitmq-server-generic-unix-3.0.0.tar.gz'
-  sha1 'a899199afe0bda17676f359789e0fea4ba8caea9'
+  url 'http://www.rabbitmq.com/releases/rabbitmq-server/v3.0.4/rabbitmq-server-generic-unix-3.0.4.tar.gz'
+  sha1 '5202b063404e703a21e8d72b20f171bc540ba933'
 
   depends_on 'erlang'
   depends_on 'simplejson' => :python if MacOS.version == :leopard
@@ -26,14 +26,19 @@ class Rabbitmq < Formula
     rabbitmq_env_conf = etc+'rabbitmq/rabbitmq-env.conf'
     rabbitmq_env_conf.write rabbitmq_env unless rabbitmq_env_conf.exist?
 
-    # Enable the management web UI
+    # Enable the management web UI and visualiser
     enabled_plugins_path = etc+'rabbitmq/enabled_plugins'
     enabled_plugins_path.write enabled_plugins unless enabled_plugins_path.exist?
 
-    # Extract rabbitmqadmin to sbin
-    system "/usr/bin/unzip", "-qq", "-j", "#{prefix}/plugins/rabbitmq_management-#{version}.ez", "rabbitmq_management-#{version}/priv/www/cli/rabbitmqadmin"
+    # Extract rabbitmqadmin and install to sbin
+    # use it to generate, then install the bash completion file
+    system "/usr/bin/unzip", "-qq", "-j",
+           "#{prefix}/plugins/rabbitmq_management-#{version}.ez",
+           "rabbitmq_management-#{version}/priv/www/cli/rabbitmqadmin"
+
     sbin.install 'rabbitmqadmin'
 
+    (prefix+'etc/bash_completion.d/rabbitmqadmin.bash').write `#{sbin}/rabbitmqadmin --bash-completion`
   end
 
   def caveats; <<-EOS.undent
@@ -67,8 +72,6 @@ class Rabbitmq < Formula
         <string>#{opt_prefix}/sbin/rabbitmq-server</string>
         <key>RunAtLoad</key>
         <true/>
-        <key>UserName</key>
-        <string>#{`whoami`.chomp}</string>
         <key>EnvironmentVariables</key>
         <dict>
           <!-- need erl in the path -->
