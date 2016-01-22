@@ -1,46 +1,36 @@
-require 'formula'
-
-class LibarchiveHeader < Formula
-  url 'https://raw.github.com/libarchive/libarchive/8076b31490c90aaf0edccecf760004c30bd95edc/libarchive/archive.h'
-  sha1 '03c57e135cad9ca9d52604324d798ca1115838ce'
-  version '3.0.4'
-end
-class LibarchiveEntryHeader < Formula
-  url 'https://raw.github.com/libarchive/libarchive/8076b31490c90aaf0edccecf760004c30bd95edc/libarchive/archive_entry.h'
-  sha1 '7eaee18321409fbb249cb59e9997757c740d7ecf'
-  version '3.0.4'
-end
-
 class Rdup < Formula
-  homepage 'http://miek.nl/projects/rdup/index.html'
-  url 'http://miek.nl/projects/rdup/rdup-1.1.14.tar.bz2'
-  sha1 '49dc7570122bfa362f36a26a2ffa8bfe8ad55182'
+  desc "Utility to create a file list suitable for making backups"
+  homepage "https://archive.miek.nl/projects/rdup/"
+  url "https://archive.miek.nl/projects/rdup/rdup-1.1.14.tar.bz2"
+  sha256 "b25e2b0656d2e6a9cb97a37f493913c4156468d4c21cea15a9a0c7b353e3742a"
+  revision 2
 
-  depends_on 'pkg-config' => :build
-  depends_on 'automake' => :build
-  depends_on 'nettle'
-  depends_on 'pcre'
-  depends_on 'glib'
+  bottle do
+    cellar :any
+    sha256 "9ea24b36882c48e95dd8c8f8653ee9568ce1bc73e5feaf1cc0c815939776f1bf" => :el_capitan
+    sha256 "163ee2ee0b3a2ada8119779d071d5dd52bbf26c242f0114e39b42d5ce47bb352" => :yosemite
+    sha256 "955fc1c20fd4d9daddef07f0cc4f8475f310040ed797ba0e00e1a76f91a74a46" => :mavericks
+  end
+
+  depends_on "pkg-config" => :build
+  depends_on "nettle"
+  depends_on "pcre"
+  depends_on "glib"
+  depends_on "libarchive"
+  depends_on "mcrypt"
 
   def install
     ENV.deparallelize
-    # to pick up locally downloaded libarchive headers
-    ENV.append 'CFLAGS', "-I."
 
     system "./configure", "--prefix=#{prefix}"
 
     # let rdup know that we actually have dirfd
     system "echo '#define HAVE_DIRFD 1' >> config.h"
 
-    # get required libarchive headers (they don't come with OS X,
-    #   although libarchive itself is there)
-    LibarchiveHeader.new.brew { cp "archive.h", buildpath }
-    LibarchiveEntryHeader.new.brew { cp "archive_entry.h", buildpath }
-
     system "make", "install"
   end
 
-  def test
+  test do
     # tell rdup to archive itself, then let rdup-tr make a tar archive of it,
     # and test with tar and grep whether the resulting tar archive actually
     # contains rdup

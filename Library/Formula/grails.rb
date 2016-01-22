@@ -1,43 +1,25 @@
-require 'formula'
-
 class Grails < Formula
-  homepage 'http://grails.org'
-  url 'http://dist.springframework.org.s3.amazonaws.com/release/GRAILS/grails-2.2.2.zip'
-  sha1 '09a0ee9791cd679203016022d20ce7163a5465b1'
+  desc "Web application framework for the Groovy language"
+  homepage "https://grails.org"
+  url "https://github.com/grails/grails-core/releases/download/v3.0.9/grails-3.0.9.zip"
+  sha256 "f1bfdec6efd45283c810e29be4433f134118344d2eabea870ae553fb66c864b1"
+
+  bottle :unneeded
 
   def install
     rm_f Dir["bin/*.bat", "bin/cygrails", "*.bat"]
-    prefix.install_metafiles
-    libexec.install Dir['*']
+    libexec.install Dir["*"]
     bin.install_symlink Dir["#{libexec}/bin/*"]
   end
 
   def caveats; <<-EOS.undent
-    Notes On Upgrading Grails From Versions < 1.3.7
-
-    The directory layout has been changed slightly for versions >= 1.3.7
-    in order to conform with Homebrew conventions for installation of Java
-    jar files.  Please note the following:
-
-    Before upgrading:
-      run 'brew unlink grails' (keeps old version in cellar)
-    or
-      run 'brew rm grails' (deletes old version from cellar)
-
-    and then:
-      run 'brew prune'
-
-    This is to ensure that HOMEBREW_PREFIX is cleaned of references to the
-    old version.
-
-    The Grails home directory for versions < 1.3.7 was in the form:
-      #{HOMEBREW_CELLAR}/grails/1.3.6
-
-    For versions >= 1.3.7, the Grails home directory is in the form:
-      #{libexec}
-
-    If you set the GRAILS_HOME variable explicitly in your shell environment,
-    change its value accordingly.
+    The GRAILS_HOME directory is:
+      #{opt_libexec}
     EOS
+  end
+
+  test do
+    output = shell_output("#{bin}/grails --version")
+    assert_match /Grails Version: #{version}/, output
   end
 end

@@ -1,148 +1,153 @@
-require 'formula'
-
 class Qt < Formula
-  homepage 'http://qt-project.org/'
-  url 'http://releases.qt-project.org/qt4/source/qt-everywhere-opensource-src-4.8.4.tar.gz'
-  sha1 'f5880f11c139d7d8d01ecb8d874535f7d9553198'
+  desc "Cross-platform application and UI framework"
+  homepage "https://www.qt.io/"
+  revision 2
 
-  bottle do
-    revision 1
-    sha1 '7fb679119b8b463055849dea791cc7fca62c62d1' => :mountain_lion
-    sha1 'b456ff5f8d18fc53b4546119d00d8ff0dda92f90' => :lion
-    sha1 '920992e5059a5c816b4eb245597fc028ff6b09ae' => :snow_leopard
+  head "https://code.qt.io/qt/qt.git", :branch => "4.8"
+
+  stable do
+    url "https://download.qt.io/official_releases/qt/4.8/4.8.7/qt-everywhere-opensource-src-4.8.7.tar.gz"
+    mirror "https://www.mirrorservice.org/sites/download.qt-project.org/official_releases/qt/4.8/4.8.7/qt-everywhere-opensource-src-4.8.7.tar.gz"
+    sha256 "e2882295097e47fe089f8ac741a95fef47e0a73a3f3cdf21b56990638f626ea0"
   end
 
-  head 'git://gitorious.org/qt/qt.git', :branch => 'master'
+  bottle do
+    sha256 "f6dc9df6f78e1d8c12ebf961c8a9196885a1ee732eed098b2cbe8320f2d9a7a8" => :el_capitan
+    sha256 "323bcba88bd3600a4a5dc26d43602e57a71609f1d9a620b9d42b63426569e191" => :yosemite
+    sha256 "157a2338190f124a7c9446ecafa6669f503ca4e0221fece620096832a767f852" => :mavericks
+  end
+
+  # Backport of Qt5 commit to fix the fatal build error with Xcode 7, SDK 10.11.
+  # http://code.qt.io/cgit/qt/qtbase.git/commit/?id=b06304e164ba47351fa292662c1e6383c081b5ca
+  patch do
+    url "https://raw.githubusercontent.com/Homebrew/patches/480b7142c4e2ae07de6028f672695eb927a34875/qt/el-capitan.patch"
+    sha256 "c8a0fa819c8012a7cb70e902abb7133fc05235881ce230235d93719c47650c4e"
+  end
 
   option :universal
-  option 'with-qtdbus', 'Enable QtDBus module'
-  option 'with-qt3support', 'Enable deprecated Qt3Support module'
-  option 'with-demos-examples', 'Enable Qt demos and examples'
-  option 'with-debug-and-release', 'Compile Qt in debug and release mode'
-  option 'developer', 'Compile and link Qt with developer options'
+  option "with-qt3support", "Build with deprecated Qt3Support module support"
+  option "with-docs", "Build documentation"
+  option "without-webkit", "Build without QtWebKit module"
 
-  depends_on :libpng
-
-  depends_on "d-bus" if build.with? 'qtdbus'
+  depends_on "openssl"
+  depends_on "d-bus" => :optional
   depends_on "mysql" => :optional
-  depends_on 'sqlite' if MacOS.version == :leopard
+  depends_on "postgresql" => :optional
 
-  def patches
-    # Fixes compilation failure on Leopard.
-    # https://bugreports.qt-project.org/browse/QTBUG-23258
-    if MacOS.version == :leopard
-      "http://bugreports.qt-project.org/secure/attachment/26712/Patch-Qt-4.8-for-10.5"
-    end
+  deprecated_option "qtdbus" => "with-d-bus"
+
+  resource "test-project" do
+    url "https://gist.github.com/tdsmith/f55e7e69ae174b5b5a03.git",
+        :revision => "6f565390395a0259fa85fdd3a4f1968ebcd1cc7d"
   end
 
   def install
-    ENV.append "CXXFLAGS", "-fvisibility=hidden"
+    ENV.universal_binary if build.universal?
 
-    # clang complains about extra qualifier since Xcode 4.6 (clang build 425)
-    # https://bugreports.qt-project.org/browse/QTBUG-29373
-    if MacOS.clang_build_version >= 425
-      inreplace "src/gui/kernel/qt_cocoa_helpers_mac_p.h",
-                "::TabletProximityRec",
-                "TabletProximityRec"
+    args = %W[
+      -prefix #{prefix}
+      -release
+      -opensource
+      -confirm-license
+      -fast
+      -system-zlib
+      -qt-libtiff
+      -qt-libpng
+      -qt-libjpeg
+      -nomake demos
+      -nomake examples
+      -cocoa
+    ]
+
+    if ENV.compiler == :clang
+      args << "-platform"
+
+      if MacOS.version >= :mavericks
+        args << "unsupported/macx-clang-libc++"
+      else
+        args << "unsupported/macx-clang"
+      end
     end
 
-    args = ["-prefix", prefix,
-            "-system-libpng", "-system-zlib",
-            "-confirm-license", "-opensource",
-            "-cocoa", "-fast" ]
+    args << "-openssl-linked"
+    args << "-I" << Formula["openssl"].opt_include
+    args << "-L" << Formula["openssl"].opt_lib
 
-    # we have to disable all tjos to avoid triggering optimization code
-    # that will fail with clang. Only seems to occur in superenv, perhaps
-    # because we rename clang to cc and Qt thinks it can build with special
-    # assembler commands. In --env=std, Qt seems aware of this.)
-    # But we want superenv, because it allows to build Qt in non-standard
-    # locations and with Xcode-only.
-    args << "-no-3dnow" if superenv?
+    args << "-plugin-sql-mysql" if build.with? "mysql"
+    args << "-plugin-sql-psql" if build.with? "postgresql"
 
-    args << "-L#{MacOS::X11.prefix}/lib" << "-I#{MacOS::X11.prefix}/include" if MacOS::X11.installed?
-
-    args << "-platform" << "unsupported/macx-clang" if ENV.compiler == :clang
-
-    # See: https://github.com/mxcl/homebrew/issues/issue/744
-    args << "-system-sqlite" if MacOS.version == :leopard
-
-    args << "-plugin-sql-mysql" if build.with? 'mysql'
-
-    if build.with? 'qtdbus'
-      args << "-I#{Formula.factory('d-bus').lib}/dbus-1.0/include"
-      args << "-I#{Formula.factory('d-bus').include}/dbus-1.0"
+    if build.with? "d-bus"
+      dbus_opt = Formula["d-bus"].opt_prefix
+      args << "-I#{dbus_opt}/lib/dbus-1.0/include"
+      args << "-I#{dbus_opt}/include/dbus-1.0"
+      args << "-L#{dbus_opt}/lib"
+      args << "-ldbus-1"
+      args << "-dbus-linked"
     end
 
-    if build.with? 'qt3support'
+    if build.with? "qt3support"
       args << "-qt3support"
     else
       args << "-no-qt3support"
     end
 
-    unless build.with? 'demos-examples'
-      args << "-nomake" << "demos" << "-nomake" << "examples"
+    args << "-nomake" << "docs" if build.without? "docs"
+
+    if MacOS.prefer_64_bit? || build.universal?
+      args << "-arch" << "x86_64"
     end
 
-    if MacOS.prefer_64_bit? or build.universal?
-      args << '-arch' << 'x86_64'
+    if !MacOS.prefer_64_bit? || build.universal?
+      args << "-arch" << "x86"
     end
 
-    if !MacOS.prefer_64_bit? or build.universal?
-      args << '-arch' << 'x86'
-    end
-
-    if build.with? 'debug-and-release'
-      args << "-debug-and-release"
-      # Debug symbols need to find the source so build in the prefix
-      mv "../qt-everywhere-opensource-src-#{version}", "#{prefix}/src"
-      cd "#{prefix}/src"
-    else
-      args << "-release"
-    end
-
-    args << '-developer-build' if build.include? 'developer'
+    args << "-no-webkit" if build.without? "webkit"
 
     system "./configure", *args
     system "make"
     ENV.j1
-    system "make install"
+    system "make", "install"
 
-    # stop crazy disk usage
-    (prefix+'doc/html').rmtree
-    (prefix+'doc/src').rmtree
     # what are these anyway?
-    (bin+'pixeltool.app').rmtree
-    (bin+'qhelpconverter.app').rmtree
+    (bin+"pixeltool.app").rmtree
+    (bin+"qhelpconverter.app").rmtree
     # remove porting file for non-humans
-    (prefix+'q3porting.xml').unlink
+    (prefix+"q3porting.xml").unlink if build.without? "qt3support"
 
     # Some config scripts will only find Qt in a "Frameworks" folder
-    # VirtualBox is an example of where this is needed
-    # See: https://github.com/mxcl/homebrew/issues/issue/745
-    cd prefix do
-      ln_s lib, prefix + "Frameworks"
-    end
+    frameworks.install_symlink Dir["#{lib}/*.framework"]
 
     # The pkg-config files installed suggest that headers can be found in the
     # `include` directory. Make this so by creating symlinks from `include` to
     # the Frameworks' Headers folders.
-    Pathname.glob(lib + '*.framework/Headers').each do |path|
-      framework_name = File.basename(File.dirname(path), '.framework')
-      ln_s path.realpath, include+framework_name
+    Pathname.glob("#{lib}/*.framework/Headers") do |path|
+      include.install_symlink path => path.parent.basename(".framework")
     end
 
-    Pathname.glob(bin + '*.app').each do |path|
-      mv path, prefix
-    end
-  end
+    # Make `HOMEBREW_PREFIX/lib/qt4/plugins` an additional plug-in search path
+    # for Qt Designer to support formulae that provide Qt Designer plug-ins.
+    system "/usr/libexec/PlistBuddy",
+            "-c", "Add :LSEnvironment:QT_PLUGIN_PATH string \"#{HOMEBREW_PREFIX}/lib/qt4/plugins\"",
+           "#{bin}/Designer.app/Contents/Info.plist"
 
-  test do
-    system "#{bin}/qmake", '-project'
+    Pathname.glob("#{bin}/*.app") { |app| mv app, prefix }
   end
 
   def caveats; <<-EOS.undent
     We agreed to the Qt opensource license for you.
     If this is unacceptable you should uninstall.
+
+    Qt Designer no longer picks up changes to the QT_PLUGIN_PATH environment
+    variable as it was tweaked to search for plug-ins provided by formulae in
+      #{HOMEBREW_PREFIX}/lib/qt4/plugins
     EOS
+  end
+
+  test do
+    Encoding.default_external = "UTF-8" unless RUBY_VERSION.start_with? "1."
+    resource("test-project").stage testpath
+    system bin/"qmake"
+    system "make"
+    assert_match /GitHub/, pipe_output(testpath/"qtnetwork-test 2>&1", nil, 0)
   end
 end

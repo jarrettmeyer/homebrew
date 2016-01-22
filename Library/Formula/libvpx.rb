@@ -1,58 +1,46 @@
-require 'formula'
-
 class Libvpx < Formula
-  homepage 'http://www.webmproject.org/code/'
-  url 'http://webm.googlecode.com/files/libvpx-v1.1.0.tar.bz2'
-  sha1 '356af5f770c50cd021c60863203d8f30164f6021'
+  desc "VP8 video codec"
+  homepage "http://www.webmproject.org/code/"
+  url "https://github.com/webmproject/libvpx/archive/v1.5.0.tar.gz"
+  sha256 "f199b03b67042e8d94a3ae8bc841fb82b6a8430bdf3965aeeaafe8245bcfa699"
+  head "https://chromium.googlesource.com/webm/libvpx", :using => :git
 
-  depends_on 'yasm' => :build
+  bottle do
+    sha256 "662f6f2cb3fab1a9fa74ecd100a9266d86d10a60e179a11b0c80594f4bd7e347" => :el_capitan
+    sha256 "0209b85c32d4c08e23db9afa56bd4c9c0535ebbd1af1f36488b6e34ec1d6e8a1" => :yosemite
+    sha256 "423d1ecee05d00a68d04e390d368c0a03f1597a28d02793cdad3c1219abf4a03" => :mavericks
+  end
 
-  option 'gcov', 'Enable code coverage'
-  option 'mem-tracker', 'Enable tracking memory usage'
-  option 'visualizer', 'Enable post processing visualizer'
+  option "with-gcov", "Enable code coverage"
+  option "with-visualizer", "Enable post processing visualizer"
+  option "with-examples", "Build examples (vpxdec/vpxenc)"
 
-  # Fixes build error on ML, discussed in:
-  # https://github.com/mxcl/homebrew/issues/12567
-  # yasm: FATAL: unable to open include file `asm_enc_offsets.asm'.  Reported to:
-  # https://groups.google.com/a/webmproject.org/group/webm-discuss/browse_thread/thread/39d1166feac1061c
-  # Not yet in HEAD as of 20 JUN 2012.
-  def patches; DATA; end
+  deprecated_option "gcov" => "with-gcov"
+  deprecated_option "visualizer" => "with-visualizer"
+
+  depends_on "yasm" => :build
 
   def install
-    args = ["--prefix=#{prefix}",
-            "--enable-pic",
-            "--disable-examples",
-            "--disable-runtime-cpu-detect"]
-    args << "--enable-gcov" if build.include? "gcov" and not ENV.compiler == :clang
-    args << "--enable-mem-tracker" if build.include? "mem-tracker"
-    args << "--enable-postproc-visualizer" if build.include? "visualizer"
+    args = %W[
+      --prefix=#{prefix}
+      --disable-dependency-tracking
+      --enable-pic
+      --disable-unit-tests
+    ]
 
-    # see http://code.google.com/p/webm/issues/detail?id=401
-    # Configure misdetects 32-bit 10.6.
-    # Determine if the computer runs Darwin 9, 10, or 11 using uname -r.
-    osver = %x[uname -r | cut -d. -f1].chomp
-    if MacOS.prefer_64_bit? then
-      args << "--target=x86_64-darwin#{osver}-gcc"
-    else
-      args << "--target=x86-darwin#{osver}-gcc"
+    args << (build.with?("examples") ? "--enable-examples" : "--disable-examples")
+    args << "--enable-gcov" if !ENV.compiler == :clang && build.with?("gcov")
+    args << "--enable-postproc" << "--enable-postproc-visualizer" if build.with? "visualizer"
+
+    # configure misdetects 32-bit 10.6
+    # https://code.google.com/p/webm/issues/detail?id=401
+    if MacOS.version == "10.6" && Hardware.is_32_bit?
+      args << "--target=x86-darwin10-gcc"
     end
 
-    mkdir 'macbuild' do
+    mkdir "macbuild" do
       system "../configure", *args
-      system "make install"
+      system "make", "install"
     end
   end
 end
-
-__END__
---- a/build/make/gen_asm_deps.sh	2012-05-08 16:14:00.000000000 -0700
-+++ b/build/make/gen_asm_deps.sh	2012-06-19 20:26:54.000000000 -0700
-@@ -42,7 +42,7 @@
- 
- [ -n "$srcfile" ] || show_help
- sfx=${sfx:-asm}
--includes=$(LC_ALL=C egrep -i "include +\"?+[a-z0-9_/]+\.${sfx}" $srcfile |
-+includes=$(LC_ALL=C egrep -i "include +\"+[a-z0-9_/]+\.${sfx}" $srcfile |
-            perl -p -e "s;.*?([a-z0-9_/]+.${sfx}).*;\1;")
- #" restore editor state
- for inc in ${includes}; do

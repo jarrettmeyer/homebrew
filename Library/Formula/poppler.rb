@@ -1,49 +1,77 @@
-require 'formula'
-
-class PopplerData < Formula
-  url 'http://poppler.freedesktop.org/poppler-data-0.4.6.tar.gz'
-  sha1 'f030563eed9f93912b1a546e6d87936d07d7f27d'
-end
-
 class Poppler < Formula
-  homepage 'http://poppler.freedesktop.org'
-  url 'http://poppler.freedesktop.org/poppler-0.22.3.tar.gz'
-  sha1 '92fd3d2f56cf74bb76e4856a8ac606330343ba8d'
+  desc "PDF rendering library (based on the xpdf-3.0 code base)"
+  homepage "http://poppler.freedesktop.org"
+  url "http://poppler.freedesktop.org/poppler-0.40.0.tar.xz"
+  sha256 "bc0da278d6038ffc9cd2b8c1bba530a6ec7c072a593219a48f0a52a600ee6ead"
 
-  option 'with-qt4', 'Build Qt backend'
-  option 'with-glib', 'Build Glib backend'
+  bottle do
+    sha256 "0d7bd1a214efd23f0e442aefa0c895b20abe11029da59a618f4fed899eee9dda" => :el_capitan
+    sha256 "b48472f8508e928eceac6db8d1363b85e13d76ef6f05bfa12b6a976569199030" => :yosemite
+    sha256 "62bc115a80c66f19de6a058ce0f2a56de97084e14844b0b617b40e540e461af6" => :mavericks
+  end
 
-  depends_on 'pkg-config' => :build
+  option "with-qt", "Build Qt backend"
+  option "with-qt5", "Build Qt5 backend"
+  option "with-little-cms2", "Use color management system"
 
-  depends_on :fontconfig
-  depends_on 'openjpeg'
+  deprecated_option "with-qt4" => "with-qt"
+  deprecated_option "with-lcms2" => "with-little-cms2"
 
-  depends_on 'qt' if build.include? 'with-qt4'
-  depends_on 'glib' if build.include? 'with-glib'
-  depends_on 'cairo' if build.include? 'with-glib' # Needs a newer Cairo build than OS X 10.6.7 provides
+  depends_on "pkg-config" => :build
+  depends_on "cairo"
+  depends_on "fontconfig"
+  depends_on "freetype"
+  depends_on "gettext"
+  depends_on "glib"
+  depends_on "gobject-introspection"
+  depends_on "jpeg"
+  depends_on "libpng"
+  depends_on "libtiff"
+  depends_on "openjpeg"
+
+  depends_on "qt" => :optional
+  depends_on "qt5" => :optional
+  depends_on "little-cms2" => :optional
+
+  conflicts_with "pdftohtml", :because => "both install `pdftohtml` binaries"
+
+  resource "font-data" do
+    url "http://poppler.freedesktop.org/poppler-data-0.4.7.tar.gz"
+    sha256 "e752b0d88a7aba54574152143e7bf76436a7ef51977c55d6bd9a48dccde3a7de"
+  end
 
   def install
-    if build.include? 'with-qt4'
-      ENV['POPPLER_QT4_CFLAGS'] = `#{HOMEBREW_PREFIX}/bin/pkg-config QtCore QtGui --libs`.chomp
-      ENV.append 'LDFLAGS', "-Wl,-F#{HOMEBREW_PREFIX}/lib"
+    ENV["LIBOPENJPEG_CFLAGS"] = "-I#{Formula["openjpeg"].opt_include}/openjpeg-1.5"
+
+    args = %W[
+      --disable-dependency-tracking
+      --prefix=#{prefix}
+      --enable-xpdf-headers
+      --enable-poppler-glib
+      --disable-gtk-test
+      --enable-introspection=yes
+    ]
+
+    if build.with?("qt") && build.with?("qt5")
+      raise "poppler: --with-qt and --with-qt5 cannot be used at the same time"
+    elsif build.with? "qt"
+      args << "--enable-poppler-qt4"
+    elsif build.with? "qt5"
+      args << "--enable-poppler-qt5"
+    else
+      args << "--disable-poppler-qt4" << "--disable-poppler-qt5"
     end
 
-    args = ["--disable-dependency-tracking", "--prefix=#{prefix}", "--enable-xpdf-headers"]
-    # Explicitly disable Qt if not requested because `POPPLER_QT4_CFLAGS` won't
-    # be set and the build will fail.
-    #
-    # Also, explicitly disable Glib as Poppler will find it and set up to
-    # build, but Superenv will have stripped the Glib utilities out of the
-    # PATH.
-    args << ( build.include?('with-qt4') ? '--enable-poppler-qt4' : '--disable-poppler-qt4' )
-    args << ( build.include?('with-glib') ? '--enable-poppler-glib' : '--disable-poppler-glib' )
+    args << "--enable-cms=lcms2" if build.with? "little-cms2"
 
     system "./configure", *args
-    system "make install"
-
-    # Install poppler font data.
-    PopplerData.new.brew do
+    system "make", "install"
+    resource("font-data").stage do
       system "make", "install", "prefix=#{prefix}"
     end
+  end
+
+  test do
+    system "#{bin}/pdfinfo", test_fixtures("test.pdf")
   end
 end

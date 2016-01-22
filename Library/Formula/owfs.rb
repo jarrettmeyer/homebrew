@@ -1,27 +1,22 @@
-require 'formula'
-
 class Owfs < Formula
-  homepage 'http://owfs.org/'
-  url 'http://sourceforge.net/projects/owfs/files/owfs/2.9p0/owfs-2.9p0.tar.gz'
-  version '2.9p0'
-  sha1 '21b28222e36aca35f62db17e84b0fdf3139aae60'
+  desc "Monitor and control physical environment using Dallas/Maxim 1-wire system"
+  homepage "http://owfs.org/"
+  url "https://downloads.sourceforge.net/project/owfs/owfs/3.1p0/owfs-3.1p0.tar.gz"
+  version "3.1p0"
+  sha256 "62fca1b3e908cd4515c9eb499bf2b05020bbbea4a5b73611ddc6f205adec7a54"
 
-  depends_on 'libusb-compat'
-
-  # Fixes inline functions in clang.
-  # Reported upstream:
-  # http://sourceforge.net/mailarchive/message.php?msg_id=30219156
-  def patches
-    DATA if ENV.compiler == :clang
+  bottle do
+    cellar :any
+    sha256 "97c0ad182ab7c5f000ed8734272be3a0aac38cf6df9cb7bb2e0f67825cf0a717" => :yosemite
+    sha256 "5682fed7463f0c20636a6fb961ff4edde845a497b55618eaff2d986613e09e20" => :mavericks
+    sha256 "f71d3106d44a4afd36a8d19057da893528e85c528a5727cc1ed278db0e44da2e" => :mountain_lion
   end
+
+  depends_on "libusb-compat"
 
   def install
     # Fix include of getline and strsep to avoid crash
-    inreplace 'configure', '-D_POSIX_C_SOURCE=200112L', ''
-
-    # 'tac' command is missing in MacOSX
-    inreplace 'src/man/Makefile.am', 'tac', 'tail -r'
-    inreplace 'src/man/Makefile.in', 'tac', 'tail -r'
+    inreplace "configure", "-D_POSIX_C_SOURCE=200112L", ""
 
     system "./configure", "--disable-debug",
                           "--disable-dependency-tracking",
@@ -32,52 +27,10 @@ class Owfs < Formula
                           "--disable-owpython",
                           "--disable-owperl",
                           "--prefix=#{prefix}"
-    system "make install"
+    system "make", "install"
   end
 
   test do
     system "#{bin}/owserver", "--version"
   end
 end
-
-
-__END__
-
-diff --git a/module/owlib/src/include/rwlock.h b/module/owlib/src/include/rwlock.h
-index 29246ea..57fce7a 100644
---- a/module/owlib/src/include/rwlock.h
-+++ b/module/owlib/src/include/rwlock.h
-@@ -26,10 +26,10 @@ typedef struct {
- } my_rwlock_t;
-
- void my_rwlock_init(my_rwlock_t * rwlock);
--inline void my_rwlock_write_lock(my_rwlock_t * rwlock);
--inline void my_rwlock_write_unlock(my_rwlock_t * rwlock);
--inline void my_rwlock_read_lock(my_rwlock_t * rwlock);
--inline void my_rwlock_read_unlock(my_rwlock_t * rwlock);
-+void my_rwlock_write_lock(my_rwlock_t * rwlock);
-+void my_rwlock_write_unlock(my_rwlock_t * rwlock);
-+void my_rwlock_read_lock(my_rwlock_t * rwlock);
-+void my_rwlock_read_unlock(my_rwlock_t * rwlock);
- void my_rwlock_destroy(my_rwlock_t * rwlock);
-
- #else /* not OW_MT */
-diff --git a/module/ownet/c/src/include/rwlock.h b/module/ownet/c/src/include/rwlock.h
-index 28fc598..c5e6188 100644
---- a/module/ownet/c/src/include/rwlock.h
-+++ b/module/ownet/c/src/include/rwlock.h
-@@ -26,10 +26,10 @@ typedef struct {
- } my_rwlock_t;
-
- void my_rwlock_init(my_rwlock_t * rwlock);
--inline void my_rwlock_write_lock(my_rwlock_t * rwlock);
--inline void my_rwlock_write_unlock(my_rwlock_t * rwlock);
--inline void my_rwlock_read_lock(my_rwlock_t * rwlock);
--inline void my_rwlock_read_unlock(my_rwlock_t * rwlock);
-+void my_rwlock_write_lock(my_rwlock_t * rwlock);
-+void my_rwlock_write_unlock(my_rwlock_t * rwlock);
-+void my_rwlock_read_lock(my_rwlock_t * rwlock);
-+void my_rwlock_read_unlock(my_rwlock_t * rwlock);
- void my_rwlock_destroy(my_rwlock_t * rwlock);
-
- #endif             /* OW_MT */

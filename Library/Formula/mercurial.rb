@@ -1,66 +1,32 @@
-require 'formula'
-
+# No head build supported; if you need head builds of Mercurial, do so outside
+# of Homebrew.
 class Mercurial < Formula
-  homepage 'http://mercurial.selenic.com/'
-  url 'http://mercurial.selenic.com/release/mercurial-2.5.4.tar.gz'
-  sha1 '9a387a041fe808833fe3512229eb35c6d5274188'
+  desc "Scalable distributed version control system"
+  homepage "https://mercurial-scm.org/"
+  url "https://mercurial-scm.org/release/mercurial-3.6.3.tar.gz"
+  sha256 "402731f27256beb9a575a6991ca3d7059976197c905337f4f5729fd940329fa8"
 
-  head 'http://selenic.com/repo/hg', :using => :hg
-
-  depends_on 'docutils' => :python if build.head? or build.include? 'doc'
-
-  option 'doc', "Build the documentation"
+  bottle do
+    cellar :any_skip_relocation
+    sha256 "a4b872fbbe02995f6e8ea55a764e1a31b9008faa2b34c9697262a0b0538d4be6" => :el_capitan
+    sha256 "8bdf939123b70cc67d6370d95a7312a16fb3a1aa1cdb0425832935017b60241e" => :yosemite
+    sha256 "1efdd4f90c177922f039d2968c09abffc4c53b2c71c0f583cd500dafbaf9877d" => :mavericks
+  end
 
   def install
-    # Don't add compiler specific flags so we can build against
-    # System-provided Python.
-    ENV.minimal_optimization
+    ENV.minimal_optimization if MacOS.version <= :snow_leopard
 
-    # install the completion script
-    (prefix/'etc/bash_completion.d').install 'contrib/bash_completion' => 'hg-completion.bash'
+    system "make", "PREFIX=#{prefix}", "install-bin"
+    # Install man pages, which come pre-built in source releases
+    man1.install "doc/hg.1"
+    man5.install "doc/hgignore.5", "doc/hgrc.5"
 
-    system "make doc" if build.head? or build.include? 'doc'
-    system "make local"
-
-    libexec.install 'hg', 'mercurial', 'hgext'
-
-    # Symlink the hg binary into bin
-    bin.install_symlink libexec/'hg'
-
-    # Remove the hard-coded python invocation from hg
-    inreplace bin/'hg', %r[^#!.*$], '#!/usr/bin/env python'
-
-    # Install some contribs
-    bin.install 'contrib/hgk'
-
-    # Install man pages
-    man1.install 'doc/hg.1'
-    man5.install 'doc/hgignore.5', 'doc/hgrc.5'
+    # install the completion scripts
+    bash_completion.install "contrib/bash_completion" => "hg-completion.bash"
+    zsh_completion.install "contrib/zsh_completion" => "_hg"
   end
 
-  def caveats
-    s = ''
-
-    s += <<-EOS.undent
-      Extensions have been installed to:
-        #{opt_prefix}/libexec/hgext
-    EOS
-
-    if build.head? then s += <<-EOS.undent
-
-      Mercurial is required to fetch its own repository, so there are now two
-      installations of mercurial on this machine. If the previous installation
-      was done via Homebrew, the old version may need to be cleaned up and new
-      version linked:
-
-        brew cleanup mercurial && brew link mercurial
-      EOS
-    end
-
-    return s
-  end
-
-  def test
-    system "#{bin}/hg", "debuginstall"
+  test do
+    system "#{bin}/hg", "init"
   end
 end

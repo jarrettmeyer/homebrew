@@ -1,43 +1,34 @@
-require 'formula'
-
 class Loudmouth < Formula
-  homepage 'http://www.loudmouth-project.org/'
-  url 'http://mcabber.com/files/loudmouth-1.4.3-20111204.tar.bz2'
-  version '1.4.3.111204'
-  sha1 '38010a74d28fa06624b7461e515aec47c0ff140e'
+  desc "Lightweight C library for the Jabber protocol"
+  homepage "https://mcabber.com"
+  url "https://mcabber.com/files/loudmouth/loudmouth-1.5.1.tar.bz2"
+  sha256 "ffb493b085c1d40176ecbe1c478f05932f265e0e5ba93444b87d3cd076267939"
+  revision 1
 
-  depends_on 'pkg-config' => :build
-  depends_on 'glib'
-  depends_on 'gnutls'
-  depends_on 'libidn'
-
-  # Fix compilation against newer glib. See:
-  # https://github.com/mxcl/homebrew/issues/12240
-  def patches
-    DATA
+  bottle do
+    cellar :any
+    sha256 "b1cc2d6af15d37cb3317a52d8a82422cd071c3ae4efe93353f75cdba83a20723" => :el_capitan
+    sha256 "1f5d182146487152aa2b20b7cf998b1ed57da9f0c5f9830fb2a316afcbaa48f7" => :yosemite
+    sha256 "50967fd422f40a3b911205cb4dfdac27038120c1e860646621dc7343f07c231b" => :mavericks
   end
+
+  head do
+    url "https://github.com/mcabber/loudmouth.git"
+
+    depends_on "autoconf" => :build
+    depends_on "automake" => :build
+    depends_on "libtool" => :build
+  end
+
+  depends_on "pkg-config" => :build
+  depends_on "glib"
+  depends_on "libidn"
+  depends_on "gnutls"
 
   def install
-    system "./configure", "--disable-debug",
-                          "--disable-dependency-tracking",
-                          "--prefix=#{prefix}"
-    system "make install"
+    system "./autogen.sh", "-n" if build.head?
+    system "./configure", "--disable-debug", "--disable-dependency-tracking",
+                          "--prefix=#{prefix}", "--with-ssl=gnutls"
+    system "make", "install"
   end
 end
-
-
-__END__
-diff --git a/loudmouth/lm-error.c b/loudmouth/lm-error.c
-index 103aaaf..74d3315 100644
---- a/loudmouth/lm-error.c
-+++ b/loudmouth/lm-error.c
-@@ -25,7 +25,7 @@
-  */
- 
- #include <config.h>
--#include <glib/gerror.h>
-+#include <glib.h>
- #include "lm-error.h"
- 
- GQuark
-

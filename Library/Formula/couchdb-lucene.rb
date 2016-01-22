@@ -1,20 +1,50 @@
-require 'formula'
-
 class CouchdbLucene < Formula
-  homepage 'https://github.com/rnewson/couchdb-lucene'
-  url 'https://github.com/rnewson/couchdb-lucene/archive/v0.9.0.tar.gz'
-  sha1 '99b8f8f1e644e6840896ee6c9b19c402042c1896'
+  desc "Full-text search of CouchDB documents using Lucene"
+  homepage "https://github.com/rnewson/couchdb-lucene"
+  url "https://github.com/rnewson/couchdb-lucene/archive/v1.0.2.tar.gz"
+  sha256 "c3f33890670160b14515fd1e26aa30df89f6101f36148639f213c40a6fff8e7d"
 
-  depends_on 'couchdb'
-  depends_on 'maven'
+  bottle do
+    cellar :any_skip_relocation
+    revision 1
+    sha256 "38f8b7946415fadd1ed0d0bae55a2b4a07b887b68a6513436bb33347fe25b59f" => :el_capitan
+    sha256 "9da083783bddfdff05e89511006eddc7a4e382b04b897741a7418f48f6b6dff0" => :yosemite
+    sha256 "41fdbc137d3a24139de0fd0ae4111ae7d6f14d20fb9aaba25b5ef0b5bb21085d" => :mavericks
+  end
+
+  depends_on "couchdb"
+  depends_on "maven" => :build
+  depends_on :java
 
   def install
+    ENV.java_cache
+
     system "mvn"
+    system "tar", "-xzf", "target/couchdb-lucene-#{version}-dist.tar.gz", "--strip", "1"
 
-    system "tar", "-xzf", "target/couchdb-lucene-#{version}-dist.tar.gz"
-    prefix.install Dir["couchdb-lucene-#{version}/*"]
+    prefix.install_metafiles
+    rm_rf Dir["bin/*.bat"]
+    libexec.install Dir["*"]
 
-    (etc + "couchdb/local.d/couchdb-lucene.ini").write ini_file
+    Dir.glob("#{libexec}/bin/*") do |path|
+      bin_name = File.basename(path)
+      cmd = "cl_#{bin_name}"
+      (bin/cmd).write shim_script(bin_name)
+      (libexec/"clbin").install_symlink bin/cmd => bin_name
+    end
+
+    ini_path.write(ini_file) unless ini_path.exist?
+  end
+
+  def shim_script(target); <<-EOS.undent
+    #!/bin/bash
+    export CL_BASEDIR=#{libexec}/bin
+    exec "$CL_BASEDIR/#{target}" "$@"
+    EOS
+  end
+
+  def ini_path
+    etc/"couchdb/local.d/couchdb-lucene.ini"
   end
 
   def ini_file; <<-EOS.undent
@@ -23,7 +53,7 @@ class CouchdbLucene < Formula
     EOS
   end
 
-  plist_options :manual => "#{HOMEBREW_PREFIX}/opt/couchdb-lucene/bin/run"
+  plist_options :manual => "#{HOMEBREW_PREFIX}/opt/couchdb-lucene/bin/cl_run"
 
   def plist; <<-EOS.undent
     <?xml version="1.0" encoding="UTF-8"?>
@@ -37,12 +67,10 @@ class CouchdbLucene < Formula
         <dict>
           <key>HOME</key>
           <string>~</string>
-          <key>DYLD_LIBRARY_PATH</key>
-          <string>/opt/local/lib:$DYLD_LIBRARY_PATH</string>
         </dict>
         <key>ProgramArguments</key>
         <array>
-          <string>#{opt_prefix}/bin/run</string>
+          <string>#{opt_bin}/cl_run</string>
         </array>
         <key>StandardOutPath</key>
         <string>/dev/null</string>
@@ -55,5 +83,29 @@ class CouchdbLucene < Formula
       </dict>
     </plist>
     EOS
+  end
+
+  def caveats; <<-EOS.undent
+    All commands have been installed with the prefix 'cl_'.
+
+    If you really need to use these commands with their normal names, you
+    can add a "clbin" directory to your PATH from your bashrc like:
+
+        PATH="#{opt_libexec}/clbin:$PATH"
+    EOS
+  end
+
+  test do
+    # This seems to be the easiest way to make the test play nicely in our
+    # sandbox. If it works here, it'll work in the normal location though.
+    cp_r Dir[opt_prefix/"*"], testpath
+    inreplace "bin/cl_run", "CL_BASEDIR=#{libexec}/bin",
+                            "CL_BASEDIR=#{testpath}/libexec/bin"
+
+    io = IO.popen("#{testpath}/bin/cl_run")
+    sleep 2
+    Process.kill("SIGINT", io.pid)
+    Process.wait(io.pid)
+    io.read !~ /Exception/
   end
 end

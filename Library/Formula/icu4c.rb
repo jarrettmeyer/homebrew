@@ -1,36 +1,40 @@
-require 'formula'
-
 class Icu4c < Formula
-  homepage 'http://site.icu-project.org/'
-  url 'http://download.icu-project.org/files/icu4c/50.1/icu4c-50_1-src.tgz'
-  version '50.1'
-  sha1 '9a3369c00a8be8eff935d2893849ad2eb246c0ef'
+  desc "C/C++ and Java libraries for Unicode and globalization"
+  homepage "http://site.icu-project.org/"
+  url "https://ssl.icu-project.org/files/icu4c/56.1/icu4c-56_1-src.tgz"
+  mirror "https://fossies.org/linux/misc/icu4c-56_1-src.tgz"
+  version "56.1"
+  sha256 "3a64e9105c734dcf631c0b3ed60404531bce6c0f5a64bfe1a6402a4cc2314816"
+
+  head "https://ssl.icu-project.org/repos/icu/icu/trunk/", :using => :svn
 
   bottle do
-    revision 2
-    sha1 '34c2ab788c5ca698c1902d3d6c38db0461f8b100' => :mountain_lion
-    sha1 '899afa2267843f7204583884885f2c05f8189ddc' => :lion
-    sha1 'a54cbdd33dbdcb0fd8ed2441580e91e8ff114640' => :snow_leopard
+    cellar :any
+    sha256 "a6ca9e033a1b0cc58620b5ab70dc32565a7700cc643773476ed8e1b7e5641d2c" => :el_capitan
+    sha256 "b1e4a9fcf06da4c0303d95d10fbc40b5553c22f97d5586d696807ac44a80e55b" => :yosemite
+    sha256 "64996840dbc39cb4a02cedc5d6bf2d266c01cab8ad46d956a12daf9b40c65763" => :mavericks
   end
 
-  keg_only "Conflicts; see: https://github.com/mxcl/homebrew/issues/issue/167"
+  keg_only :provided_by_osx, "OS X provides libicucore.dylib (but nothing else)."
 
   option :universal
-
-  fails_with :clang do
-    cause "Icu will turn on C++11 mode when built with clang, which causes incompatibilities."
-  end
+  option :cxx11
 
   def install
     ENV.universal_binary if build.universal?
+    ENV.cxx11 if build.cxx11?
 
-    ENV.append "LDFLAGS", "-headerpad_max_install_names"
-    args = ["--prefix=#{prefix}", "--disable-samples", "--disable-tests", "--enable-static"]
+    args = %W[--prefix=#{prefix} --disable-samples --disable-tests --enable-static]
     args << "--with-library-bits=64" if MacOS.prefer_64_bit?
+
     cd "source" do
       system "./configure", *args
       system "make"
-      system "make install"
+      system "make", "install"
     end
+  end
+
+  test do
+    system "#{bin}/gendict", "--uchars", "/usr/share/dict/words", "dict"
   end
 end

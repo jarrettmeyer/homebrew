@@ -1,13 +1,10 @@
-require 'formula'
+require "formula"
 
-module Homebrew extend self
+module Homebrew
   def pin
-    if Process.uid.zero? and not File.stat(HOMEBREW_BREW_FILE).uid.zero?
-      abort "Cowardly refusing to `sudo pin'"
-    end
     raise FormulaUnspecifiedError if ARGV.named.empty?
 
-    ARGV.formulae.each do |f|
+    ARGV.resolved_formulae.each do |f|
       if f.pinned?
         opoo "#{f.name} already pinned"
       elsif !f.pinnable?

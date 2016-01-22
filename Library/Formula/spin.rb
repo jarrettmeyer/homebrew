@@ -1,18 +1,20 @@
-require 'formula'
-
 class Spin < Formula
-  homepage 'http://spinroot.com/spin/whatispin.html'
-  url 'http://spinroot.com/spin/Src/spin624.tar.gz'
-  version '6.2.4'
-  sha1 '980d47f26f8a0f5e191fc47c2240dc96f3dceab9'
+  desc "Spin model checker"
+  homepage "https://spinroot.com/spin/whatispin.html"
+  url "https://spinroot.com/spin/Src/spin642.tar.gz"
+  version "6.4.2"
+  sha256 "d1f3ee841db0da7ba02fe1a04ebd02d316c0760ab8125616d7d2ff46f1c573e5"
+
+  bottle do
+    cellar :any_skip_relocation
+    revision 1
+    sha256 "f83fa245ef9988d38eac9e7f125fa965d1ed53463b550d8606435997d5e0da18" => :el_capitan
+    sha256 "07ac05a68769acdb0d4be2085ca2f2bca906066af85d1e2730bbed834a7d46d3" => :yosemite
+    sha256 "cb0049c50da45aafad43683a9ab813e6c3dc89a4d76890c44da3e5992a70f9b6" => :mavericks
+  end
 
   fails_with :llvm do
     build 2334
-  end
-
-  # replace -DPC with -DMAC in makefile CFLAGS
-  def patches
-    DATA
   end
 
   def install
@@ -27,26 +29,3 @@ class Spin < Formula
     man1.install "Man/spin.1"
   end
 end
-
-# manual patching is required by the spin install process
-__END__
-diff --git a/Src6.2.4/makefile b/Src6.2.4/makefile
-index 02d2a02..7687e0a 100644
---- a/Src6.2.4/makefile
-+++ b/Src6.2.4/makefile
-@@ -13,12 +13,12 @@
- 
- # see also ./make_pc for a simpler script, not requiring make
- 
--CC=gcc
--CFLAGS=-O2 -DNXT	# on some systems add: -I/usr/include
-+#CC=gcc
-+#CFLAGS=-O2 -DNXT	# on some systems add: -I/usr/include
- 
- # CC=gcc -m32 	# 32bit compilation on a 64bit system
- # for a more picky compilation use gcc-4 and:
--# CFLAGS=-std=c99 -Wstrict-prototypes -pedantic -fno-strength-reduce -fno-builtin -W -Wshadow -Wpointer-arith -Wcast-qual -Winline -Wall -g -DNXT -DPC
-+CFLAGS=-std=c99 -Wstrict-prototypes -pedantic -fno-strength-reduce -fno-builtin -W -Wshadow -Wpointer-arith -Wcast-qual -Winline -Wall -g -DNXT -DMAC
- 
- # on OS2:		spin -Picc -E/Pd+ -E/Q+
- # for Visual C++:	spin -PCL  -E/E

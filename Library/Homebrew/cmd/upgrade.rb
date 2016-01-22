@@ -1,76 +1,81 @@
-require 'cmd/install'
+require "cmd/install"
+require "cleanup"
 
-class Fixnum
-  def plural_s
-    if self > 1 then "s" else "" end
-  end
-end
-
-module Homebrew extend self
+module Homebrew
   def upgrade
-    if Process.uid.zero? and not File.stat(HOMEBREW_BREW_FILE).uid.zero?
-      # note we only abort if Homebrew is *not* installed as sudo and the user
-      # calls brew as root. The fix is to chown brew to root.
-      abort "Cowardly refusing to `sudo brew upgrade'"
-    end
+    FormulaInstaller.prevent_build_flags unless MacOS.has_apple_developer_tools?
 
     Homebrew.perform_preinstall_checks
 
     if ARGV.named.empty?
-      require 'cmd/outdated'
-      upgrade_pinned = false
-      outdated = Homebrew.outdated_brews
-    else
-      upgrade_pinned = true
-      outdated = ARGV.formulae.select do |f|
-        if f.installed?
-          onoe "#{f}-#{f.installed_version} already installed"
-        elsif not f.rack.exist? or f.rack.children.empty?
-          onoe "#{f} not installed"
+      outdated = Formula.installed.select(&:outdated?)
+      exit 0 if outdated.empty?
+    elsif ARGV.named.any?
+      outdated = ARGV.resolved_formulae.select(&:outdated?)
+
+      (ARGV.resolved_formulae - outdated).each do |f|
+        versions = f.installed_kegs.map { |keg| keg.version }
+        if versions.any?
+          version = versions.max
+          onoe "#{f.full_name} #{version} already installed"
         else
-          true
+          onoe "#{f.full_name} not installed"
         end
       end
       exit 1 if outdated.empty?
     end
 
-    unless upgrade_pinned
-      pinned = outdated.select { |f| f.pinned? }
+    unless upgrade_pinned?
+      pinned = outdated.select(&:pinned?)
       outdated -= pinned
     end
 
-    if outdated.length > 0
-      oh1 "Upgrading #{outdated.length} outdated package#{outdated.length.plural_s}, with result:"
-      puts outdated.map{ |f| "#{f.name} #{f.version}" } * ", "
+    unless outdated.empty?
+      oh1 "Upgrading #{outdated.length} outdated package#{plural(outdated.length)}, with result:"
+      puts outdated.map { |f| "#{f.full_name} #{f.pkg_version}" } * ", "
+    else
+      oh1 "No packages to upgrade"
     end
-    if not upgrade_pinned and pinned.length > 0
-      oh1 "Not upgrading #{pinned.length} pinned package#{outdated.length.plural_s}:"
-      puts pinned.map{ |f| "#{f.name} #{f.version}" } * ", "
+
+    unless upgrade_pinned? || pinned.empty?
+      oh1 "Not upgrading #{pinned.length} pinned package#{plural(pinned.length)}:"
+      puts pinned.map { |f| "#{f.full_name} #{f.pkg_version}" } * ", "
     end
 
     outdated.each do |f|
-      upgrade_formula f
+      upgrade_formula(f)
+      next unless ARGV.include?("--cleanup")
+      next unless f.installed?
+      Homebrew::Cleanup.cleanup_formula f
     end
   end
 
-  def upgrade_formula f
+  def upgrade_pinned?
+    !ARGV.named.empty?
+  end
+
+  def upgrade_formula(f)
+    outdated_keg = Keg.new(f.linked_keg.resolved_path) if f.linked_keg.directory?
     tab = Tab.for_formula(f)
-    outdated_keg = Keg.new(f.linked_keg.realpath) rescue nil
 
-    installer = FormulaInstaller.new(f)
-    installer.tab = tab
-    installer.show_header = false
+    fi = FormulaInstaller.new(f)
+    fi.options             = tab.used_options
+    fi.build_bottle        = ARGV.build_bottle? || (!f.bottled? && tab.build_bottle?)
+    fi.build_from_source   = ARGV.build_from_source?
+    fi.verbose             = ARGV.verbose?
+    fi.quieter             = ARGV.quieter?
+    fi.debug               = ARGV.debug?
+    fi.prelude
 
-    oh1 "Upgrading #{f.name}"
+    oh1 "Upgrading #{f.full_name}"
 
     # first we unlink the currently active keg for this formula otherwise it is
     # possible for the existing build to interfere with the build we are about to
     # do! Seriously, it happens!
     outdated_keg.unlink if outdated_keg
 
-    installer.install
-    installer.caveats
-    installer.finish
+    fi.install
+    fi.finish
 
     # If the formula was pinned, and we were force-upgrading it, unpin and
     # pin it again to get a symlink pointing to the correct keg.
@@ -87,9 +92,10 @@ module Homebrew extend self
     e.dump
     puts
     Homebrew.failed = true
+  rescue DownloadError => e
+    ofail e
   ensure
     # restore previous installation state if build failed
-    outdated_keg.link if outdated_keg and not f.installed? rescue nil
+    outdated_keg.link if outdated_keg && !f.installed? rescue nil
   end
-
 end

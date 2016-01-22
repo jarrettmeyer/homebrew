@@ -1,53 +1,35 @@
-require 'formula'
-
-# Include a private copy of this Python app
-# so we don't have to worry about clashing dependencies.
-class Pygments < Formula
-  homepage 'http://pygments.org/'
-  url 'http://pypi.python.org/packages/source/P/Pygments/Pygments-1.5.tar.gz'
-  sha1 '4fbd937fd5cebc79fa4b26d4cce0868c4eec5ec5'
-end
-
-class MarkdownProvider < Requirement
+class MarkdownRequirement < Requirement
   fatal true
-
-  satisfy { which 'markdown' }
-
-  def message; <<-EOS.undent
-    shocco requires a `markdown` command.
-
-    You can satisfy this requirement with either of two formulae:
-      brew install markdown
-      brew install discount
-
-    Please install one and try again.
-    EOS
-  end
+  default_formula "markdown"
+  satisfy { which "markdown" }
 end
 
 class Shocco < Formula
-  homepage 'http://rtomayko.github.io/shocco/'
-  url 'https://github.com/rtomayko/shocco/archive/1.0.tar.gz'
-  sha1 'e29d58fb8109040b4fb4a816f330bb1c67064f6d'
+  desc "Literate documentation tool for shell scripts (a la Docco)"
+  homepage "https://rtomayko.github.io/shocco/"
+  url "https://github.com/rtomayko/shocco/archive/1.0.tar.gz"
+  sha256 "b3454ca818329955043b166a9808847368fd48dbe94c4b819a9f0c02cf57ce2e"
 
-  depends_on MarkdownProvider
+  depends_on MarkdownRequirement
 
-  def patches
-    DATA
+  resource "pygments" do
+    url "https://pypi.python.org/packages/source/P/Pygments/Pygments-1.5.tar.gz"
+    sha256 "fe183e3886f597e41f8c88d0e53c796cefddc879bfdf45f2915a383060436740"
   end
 
-  def install
-    Pygments.new.brew { libexec.install 'pygmentize','pygments' }
+  # Upstream, but not in a release
+  patch :DATA
 
-    # Brew along with Pygments
+  def install
+    libexec.install resource("pygments").files("pygmentize", "pygments")
+
     system "./configure",
       "PYGMENTIZE=#{libexec}/pygmentize",
       "MARKDOWN=#{HOMEBREW_PREFIX}/bin/markdown",
       "--prefix=#{prefix}"
 
-    # Shocco's Makefile does not combine the make and make install steps.
     system "make"
-    system "make install"
+    system "make", "install"
   end
 
   def caveats

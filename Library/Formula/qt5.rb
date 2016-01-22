@@ -1,108 +1,159 @@
-require 'formula'
+class OracleHomeVarRequirement < Requirement
+  fatal true
+  satisfy(:build_env => false) { ENV["ORACLE_HOME"] }
 
+  def message; <<-EOS.undent
+      To use --with-oci you have to set the ORACLE_HOME environment variable.
+      Check Oracle Instant Client documentation for more information.
+    EOS
+  end
+end
+
+# Patches for Qt5 must be at the very least submitted to Qt's Gerrit codereview
+# rather than their bug-report Jira. The latter is rarely reviewed by Qt.
 class Qt5 < Formula
-  homepage 'http://qt-project.org/'
-  url 'http://releases.qt-project.org/qt5/5.0.1/single/qt-everywhere-opensource-src-5.0.1.tar.gz'
-  sha1 'fda04435b1d4069dc189ab4d22ed7a36fe6fa3e9'
+  desc "Version 5 of the Qt framework"
+  homepage "https://www.qt.io/"
+  head "https://code.qt.io/qt/qt5.git", :branch => "5.5", :shallow => false
+  revision 2
 
-  head 'git://gitorious.org/qt/qt5.git', :branch => 'master'
+  stable do
+    url "https://download.qt.io/official_releases/qt/5.5/5.5.1/single/qt-everywhere-opensource-src-5.5.1.tar.xz"
+    mirror "https://www.mirrorservice.org/sites/download.qt-project.org/official_releases/qt/5.5/5.5.1/single/qt-everywhere-opensource-src-5.5.1.tar.xz"
+    sha256 "6f028e63d4992be2b4a5526f2ef3bfa2fe28c5c757554b11d9e8d86189652518"
+
+    # Build error: Fix library detection for QtWebEngine with Xcode 7.
+    # https://codereview.qt-project.org/#/c/127759/
+    patch do
+      url "https://raw.githubusercontent.com/UniqMartin/patches/557a8bd4/qt5/webengine-xcode7.patch"
+      sha256 "7bd46f8729fa2c20bc486ddc5586213ccf2fb9d307b3d4e82daa78a2553f59bc"
+    end
+
+    # Fix for qmake producing broken pkg-config files, affecting Poppler et al.
+    # https://codereview.qt-project.org/#/c/126584/
+    # Should land in the 5.5.2 and/or 5.6 release.
+    patch do
+      url "https://gist.githubusercontent.com/UniqMartin/a54542d666be1983dc83/raw/f235dfb418c3d0d086c3baae520d538bae0b1c70/qtbug-47162.patch"
+      sha256 "e31df5d0c5f8a9e738823299cb6ed5f5951314a28d4a4f9f021f423963038432"
+    end
+
+    # Build issue: Fix install names with `-no-rpath` to be absolute paths.
+    # https://codereview.qt-project.org/#/c/138349
+    patch do
+      url "https://raw.githubusercontent.com/UniqMartin/patches/77d138fa/qt5/osx-no-rpath.patch"
+      sha256 "92c9cfe701f9152f4b16219a04a523338d4b77bb0725a8adccc3fc72c9fb576f"
+    end
+
+    # Fixes for Secure Transport in QtWebKit
+    # https://codereview.qt-project.org/#/c/139967/
+    # https://codereview.qt-project.org/#/c/139968/
+    # https://codereview.qt-project.org/#/c/139970/
+    # Should land in the 5.5.2 and/or 5.6 release.
+    patch do
+      url "https://gist.githubusercontent.com/The-Compiler/8202f92fff70da39353a/raw/884c3bef4d272d25d7d7202be99c3940248151ee/qt5.5-securetransport-qtwebkit.patch"
+      sha256 "c3302de2e23e74a99e62f22527e0edee5539b2e18d34c05e70075490ba7b3613"
+    end
+  end
+
+  bottle do
+    sha256 "66392beb2f58ca5763c044de0f80128c4d2747b7708dfe749ffa551e323e12e5" => :el_capitan
+    sha256 "a7b2d4ef9027f41c0e1f70ecdd39682caa343ac5314eb226e441b30b0943739d" => :yosemite
+    sha256 "6a5a3cd1331a217eb2a1abfc09d73d6e06a0ce5cafac9188aee6d96c7fc4ca4e" => :mavericks
+  end
 
   keg_only "Qt 5 conflicts Qt 4 (which is currently much more widely used)."
 
-  option :universal
-  option 'with-qtdbus', 'Enable QtDBus module'
-  option 'with-demos-examples', 'Enable Qt demos and examples'
-  option 'with-debug-and-release', 'Compile Qt in debug and release mode'
-  option 'with-mysql', 'Enable MySQL plugin'
-  option 'developer', 'Compile and link Qt with developer options'
+  option "with-docs", "Build documentation"
+  option "with-examples", "Build examples"
+  option "with-oci", "Build with Oracle OCI plugin"
 
-  depends_on :libpng
+  option "without-webengine", "Build without QtWebEngine module"
+  option "without-webkit", "Build without QtWebKit module"
 
-  depends_on "d-bus" if build.include? 'with-qtdbus'
-  depends_on "mysql" if build.include? 'with-mysql'
-  depends_on "jpeg"
+  deprecated_option "qtdbus" => "with-d-bus"
 
-  def patches
-    # http://qt.gitorious.org/qt/qtbase/commit/655ba5?format=patch
-    # Inlined to fix paths.
-    DATA
-  end
+  # OS X 10.7 Lion is still supported in Qt 5.5, but is no longer a reference
+  # configuration and thus untested in practice. Builds on OS X 10.7 have been
+  # reported to fail: <https://github.com/Homebrew/homebrew/issues/45284>.
+  depends_on :macos => :mountain_lion
+
+  depends_on "d-bus" => :optional
+  depends_on :mysql => :optional
+  depends_on :xcode => :build
+
+  depends_on OracleHomeVarRequirement if build.with? "oci"
 
   def install
-    args = ["-prefix", prefix,
-            "-system-libpng", "-system-zlib",
-            "-confirm-license", "-opensource"]
+    args = %W[
+      -prefix #{prefix}
+      -release
+      -opensource -confirm-license
+      -system-zlib
+      -qt-libpng
+      -qt-libjpeg
+      -no-openssl -securetransport
+      -nomake tests
+      -no-rpath
+    ]
 
-    unless MacOS::CLT.installed?
-      # Qt hard-codes paths (and uses -I flags) and linking fails on Xcode-only
-      args += ["-sdk", MacOS.sdk_path]
-      # Even with sdk given, Qt5 is too stupid to find CFNumber.h, so we give a hint:
-      ENV.append 'CXXFLAGS', "-I#{MacOS.sdk_path}/System/Library/Frameworks/CoreFoundation.framework/Headers"
-    end
+    args << "-nomake" << "examples" if build.without? "examples"
 
-    args << "-L#{MacOS::X11.prefix}/lib" << "-I#{MacOS::X11.prefix}/include" if MacOS::X11.installed?
+    args << "-plugin-sql-mysql" if build.with? "mysql"
 
-    args << "-plugin-sql-mysql" if build.include? 'with-mysql'
-
-    if build.include? 'with-qtdbus'
-      args << "-I#{Formula.factory('d-bus').lib}/dbus-1.0/include"
-      args << "-I#{Formula.factory('d-bus').include}/dbus-1.0"
-    end
-
-    unless build.include? 'with-demos-examples'
-      args << "-nomake" << "demos" << "-nomake" << "examples"
-    end
-
-    if MacOS.prefer_64_bit? or build.universal?
-      args << '-arch' << 'x86_64'
-    end
-
-    if !MacOS.prefer_64_bit? or build.universal?
-      args << '-arch' << 'x86'
-    end
-
-    if build.include? 'with-debug-and-release'
-      args << "-debug-and-release"
-      # Debug symbols need to find the source so build in the prefix
-      mv "../qt-everywhere-opensource-src-#{version}", "#{prefix}/src"
-      cd "#{prefix}/src"
+    if build.with? "d-bus"
+      dbus_opt = Formula["d-bus"].opt_prefix
+      args << "-I#{dbus_opt}/lib/dbus-1.0/include"
+      args << "-I#{dbus_opt}/include/dbus-1.0"
+      args << "-L#{dbus_opt}/lib"
+      args << "-ldbus-1"
+      args << "-dbus-linked"
     else
-      args << "-release"
+      args << "-no-dbus"
     end
 
-    args << '-developer-build' if build.include? 'developer'
+    if build.with? "oci"
+      args << "-I#{ENV["ORACLE_HOME"]}/sdk/include"
+      args << "-L#{ENV["ORACLE_HOME"]}"
+      args << "-plugin-sql-oci"
+    end
+
+    args << "-skip" << "qtwebengine" if build.without? "webengine"
+    args << "-skip" << "qtwebkit" if build.without? "webkit"
 
     system "./configure", *args
     system "make"
     ENV.j1
-    system "make install"
+    system "make", "install"
 
-    # what are these anyway?
-    (bin+'pixeltool.app').rmtree
-    (bin+'qhelpconverter.app').rmtree
+    if build.with? "docs"
+      system "make", "docs"
+      system "make", "install_docs"
+    end
 
     # Some config scripts will only find Qt in a "Frameworks" folder
-    # VirtualBox is an example of where this is needed
-    # See: https://github.com/mxcl/homebrew/issues/issue/745
-    cd prefix do
-      ln_s lib, prefix + "Frameworks"
-    end
+    frameworks.install_symlink Dir["#{lib}/*.framework"]
 
     # The pkg-config files installed suggest that headers can be found in the
     # `include` directory. Make this so by creating symlinks from `include` to
     # the Frameworks' Headers folders.
-    Pathname.glob(lib + '*.framework/Headers').each do |path|
-      framework_name = File.basename(File.dirname(path), '.framework')
-      ln_s path.realpath, include+framework_name
+    Pathname.glob("#{lib}/*.framework/Headers") do |path|
+      include.install_symlink path => path.parent.basename(".framework")
     end
 
-    Pathname.glob(bin + '*.app').each do |path|
-      mv path, prefix
-    end
-  end
+    # configure saved PKG_CONFIG_LIBDIR set up by superenv; remove it
+    # see: https://github.com/Homebrew/homebrew/issues/27184
+    inreplace prefix/"mkspecs/qconfig.pri", /\n\n# pkgconfig/, ""
+    inreplace prefix/"mkspecs/qconfig.pri", /\nPKG_CONFIG_.*=.*$/, ""
 
-  def test
-    system "#{bin}/qmake", "--version"
+    # Move `*.app` bundles into `libexec` to expose them to `brew linkapps` and
+    # because we don't like having them in `bin`. Also add a `-qt5` suffix to
+    # avoid conflict with the `*.app` bundles provided by the `qt` formula.
+    # (Note: This move/rename breaks invocation of Assistant via the Help menu
+    # of both Designer and Linguist as that relies on Assistant being in `bin`.)
+    libexec.mkpath
+    Pathname.glob("#{bin}/*.app") do |app|
+      mv app, libexec/"#{app.basename(".app")}-qt5.app"
+    end
   end
 
   def caveats; <<-EOS.undent
@@ -110,38 +161,34 @@ class Qt5 < Formula
     If this is unacceptable you should uninstall.
     EOS
   end
+
+  test do
+    (testpath/"hello.pro").write <<-EOS.undent
+      QT       += core
+      QT       -= gui
+      TARGET = hello
+      CONFIG   += console
+      CONFIG   -= app_bundle
+      TEMPLATE = app
+      SOURCES += main.cpp
+    EOS
+
+    (testpath/"main.cpp").write <<-EOS.undent
+      #include <QCoreApplication>
+      #include <QDebug>
+
+      int main(int argc, char *argv[])
+      {
+        QCoreApplication a(argc, argv);
+        qDebug() << "Hello World!";
+        return 0;
+      }
+    EOS
+
+    system bin/"qmake", testpath/"hello.pro"
+    system "make"
+    assert File.exist?("hello")
+    assert File.exist?("main.o")
+    system "./hello"
+  end
 end
-
-__END__
-From 655ba5755696df8e2594bca9f7696ab621f5afc3 Mon Sep 17 00:00:00 2001
-From: Gabriel de Dietrich <gabriel.dedietrich@digia.com>
-Date: Tue, 5 Feb 2013 13:39:33 +0100
-Subject: [PATCH] Cocoa QPA: Fix compilation error
-
-The error appeared with latest clang as of Feb. 5, 2013.
-
-Apple LLVM version 4.2 (clang-425.0.24) (based on LLVM 3.2svn)
-Target: x86_64-apple-darwin12.2.0
-
-Change-Id: I8df8cccc941ac03a7a997bdd5afe095b7b6f65d3
-Reviewed-by: Frederik Gladhorn <frederik.gladhorn@digia.com>
----
- src/plugins/platforms/cocoa/qcocoawindow.h |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/qtbase/src/plugins/platforms/cocoa/qcocoawindow.h b/qtbase/src/plugins/platforms/cocoa/qcocoawindow.h
-index 3b5be0a..324a43c 100644
---- a/qtbase/src/plugins/platforms/cocoa/qcocoawindow.h
-+++ b/qtbase/src/plugins/platforms/cocoa/qcocoawindow.h
-@@ -49,7 +49,8 @@
-
- #include "qcocoaglcontext.h"
- #include "qnsview.h"
--class QT_PREPEND_NAMESPACE(QCocoaWindow);
-+
-+QT_FORWARD_DECLARE_CLASS(QCocoaWindow)
-
- @interface QNSWindow : NSWindow {
-     @public QCocoaWindow *m_cocoaPlatformWindow;
---
-1.7.1

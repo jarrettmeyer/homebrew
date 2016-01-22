@@ -1,20 +1,12 @@
-require 'formula'
-
 class Openslp < Formula
-  homepage 'http://www.openslp.org'
-  url 'http://downloads.sourceforge.net/project/openslp/OpenSLP/1.2.1/openslp-1.2.1.tar.gz'
-  sha1 '47ab19154084d2b467f09525f5351e9ab7193cf9'
-
-  def patches
-    # patch for adding in missing slp_net symbols
-    { :p0 =>
-      "https://trac.macports.org/export/78024/trunk/dports/devel/openslp/files/patch-slp_net.txt"
-    }
-  end
+  desc "Implementation of Service Location Protocol"
+  homepage "http://www.openslp.org"
+  url "https://downloads.sourceforge.net/project/openslp/2.0.0/2.0.0%20Release/openslp-2.0.0.tar.gz"
+  sha256 "924337a2a8e5be043ebaea2a78365c7427ac6e9cee24610a0780808b2ba7579b"
 
   def install
     system "./configure", "--disable-debug", "--disable-dependency-tracking",
                           "--prefix=#{prefix}"
-    system "make install"
+    system "make", "install"
   end
 end

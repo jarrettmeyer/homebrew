@@ -1,47 +1,51 @@
-require 'formula'
-
 class Rrdtool < Formula
-  homepage 'http://oss.oetiker.ch/rrdtool/index.en.html'
-  url 'http://oss.oetiker.ch/rrdtool/pub/rrdtool-1.4.7.tar.gz'
-  sha1 'faab7df7696b69f85d6f89dd9708d7cf0c9a273b'
+  desc "Round Robin Database"
+  homepage "https://oss.oetiker.ch/rrdtool/index.en.html"
+  url "https://github.com/oetiker/rrdtool-1.x/releases/download/v1.5.5/rrdtool-1.5.5.tar.gz"
+  sha256 "aeb5e58799b6c02e1046e409ceed1b9ed8b3238241d952e0267c7e9be1525a54"
 
-  option 'lua', "Compile with lua support"
+  bottle do
+    sha256 "40ef7a5538670895456321c7f34e359a88556532be110fe1f5c9b75912678e98" => :el_capitan
+    sha256 "05faf9477d73dcc9880622199f170255db8f7b050502e5e0f6b2685b5c76125f" => :yosemite
+    sha256 "4ad881432a19f31f917a14d793f8838e0fbba140efeca9eb6efe7fbbf60ebdfa" => :mavericks
+  end
 
-  depends_on 'pkg-config' => :build
-  depends_on 'glib'
-  depends_on 'pango'
+  head do
+    url "https://github.com/oetiker/rrdtool-1.x.git"
+    depends_on "automake" => :build
+    depends_on "autoconf" => :build
+    depends_on "libtool" => :build
+  end
 
-  # Can use lua if it is found, but don't force users to install
-  # TODO: Do something here
-  depends_on 'lua' if build.include? "lua"
+  depends_on "pkg-config" => :build
+  depends_on "glib"
+  depends_on "pango"
+  depends_on "lua" => :optional
 
-  env :std # For perl, ruby
+  env :userpaths # For perl, ruby
 
   # Ha-ha, but sleeping is annoying when running configure a lot
-  def patches; DATA; end
+  patch :DATA
 
   def install
     ENV.libxml2
 
-    which_perl = which 'perl'
-    which_ruby = which 'ruby'
-
-    opoo "Using system Ruby. RRD module will be installed to /Library/Ruby/..." if which_ruby.realpath == RUBY_PATH
-    opoo "Using system Perl. RRD module will be installed to /Library/Perl/..." if which_perl.to_s == "/usr/bin/perl"
-
     args = %W[
       --disable-dependency-tracking
       --prefix=#{prefix}
+      --disable-tcl
+      --with-tcllib=/usr/lib
+      --disable-perl-site-install
+      --disable-ruby-site-install
     ]
-    args << "--enable-perl-site-install" if which_perl.to_s == "/usr/bin/perl"
-    args << "--enable-ruby-site-install" if which_ruby.realpath == RUBY_PATH
 
+    system "./bootstrap" if build.head?
     system "./configure", *args
 
     # Needed to build proper Ruby bundle
-    ENV["ARCHFLAGS"] = MacOS.prefer_64_bit? ? "-arch x86_64" : "-arch i386"
+    ENV["ARCHFLAGS"] = "-arch #{MacOS.preferred_arch}"
 
-    system "make install"
+    system "make", "CC=#{ENV.cc}", "CXX=#{ENV.cxx}", "install"
     prefix.install "bindings/ruby/test.rb"
   end
 
@@ -55,11 +59,11 @@ end
 
 __END__
 diff --git a/configure b/configure
-index 7487ad2..e7b85c1 100755
+index 266754d..d21ab33 100755
 --- a/configure
 +++ b/configure
-@@ -31663,18 +31663,6 @@ $as_echo_n "checking in... " >&6; }
- { $as_echo "$as_me:$LINENO: result: and out again" >&5
+@@ -23868,18 +23868,6 @@ $as_echo_n "checking in... " >&6; }
+ { $as_echo "$as_me:${as_lineno-$LINENO}: result: and out again" >&5
  $as_echo "and out again" >&6; }
 
 -echo $ECHO_N "ordering CD from http://tobi.oetiker.ch/wish $ECHO_C" 1>&6
@@ -72,7 +76,7 @@ index 7487ad2..e7b85c1 100755
 -sleep 1
 -echo $ECHO_N ".$ECHO_C" 1>&6
 -sleep 1
--{ $as_echo "$as_me:$LINENO: result:  just kidding ;-)" >&5
+-{ $as_echo "$as_me:${as_lineno-$LINENO}: result:  just kidding ;-)" >&5
 -$as_echo " just kidding ;-)" >&6; }
  echo
  echo "----------------------------------------------------------------"

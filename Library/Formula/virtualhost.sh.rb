@@ -1,13 +1,13 @@
-require 'formula'
-
 class VirtualhostSh < Formula
-  homepage 'https://github.com/pgib/virtualhost.sh'
-  url 'https://github.com/pgib/virtualhost.sh/archive/1.30.tar.gz'
-  sha1 '0de462c1ec15c4dfcd2b73d806394bc6b7f93e60'
+  desc "Script for OS X to create Apache virtual hosts"
+  homepage "https://github.com/virtualhost/virtualhost.sh"
+  url "https://github.com/virtualhost/virtualhost.sh/archive/1.35.tar.gz"
+  sha256 "75d34b807e71acd253876c6a99cdbc11ce31ffb159155373c83a99af862fffcc"
+  head "https://github.com/virtualhost/virtualhost.sh.git"
 
-  head 'https://github.com/pgib/virtualhost.sh.git'
+  bottle :unneeded
 
   def install
-    bin.install 'virtualhost.sh'
+    bin.install "virtualhost.sh"
   end
 end

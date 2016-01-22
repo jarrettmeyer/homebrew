@@ -1,50 +1,32 @@
-require 'formula'
-
 class Genstats < Formula
-  homepage 'http://www.vanheusden.com/genstats/'
-  url 'http://www.vanheusden.com/genstats/genstats-1.0.0.tgz'
-  sha1 '8ca19e5fe72f1d881bf38298e155b15f07e6bd66'
+  desc "Generate statistics about stdin or textfiles"
+  homepage "https://www.vanheusden.com/genstats/"
+  url "https://www.vanheusden.com/genstats/genstats-1.2.tgz"
+  sha256 "f0fb9f29750cdaa85dba648709110c0bc80988dd6a98dd18a53169473aaa6ad3"
 
-  def patches
-    # fix compile errors on OS X for 1.0.0. I've emailed the author.
-    DATA
+  bottle do
+    cellar :any_skip_relocation
+    sha256 "44502f7a2dfcb1355336db69267d6363d6e8b8767b47628b0d3099743513ed5f" => :el_capitan
+    sha256 "91737ec825ed346716fddcedc4e075b195f214dfb22586a33d46f7ec5ea3a17e" => :yosemite
+    sha256 "d46142a806e13029120bfb1a038805b07dc88b191aed1cd41340f5f868168f92" => :mavericks
   end
+
+  depends_on :macos => :lion # uses strndup
 
   def install
     # Tried to make this a patch.  Applying the patch hunk would
     # fail, even though I used "git diff | pbcopy".  Tried messing
     # with whitespace, # lines, etc.  Ugh.
-    inreplace 'br.cpp' do |s|
-      s.gsub! /if \(_XOPEN_VERSION >= 600\)/, 'if (_XOPEN_VERSION >= 600) && !__APPLE__'
+    inreplace "br.cpp" do |s|
+      s.gsub! /if \(_XOPEN_VERSION >= 600\)/, "if (_XOPEN_VERSION >= 600) && !__APPLE__"
     end
 
-    system 'make'
-    bin.install('genstats')
-    man.install('genstats.1')
+    system "make"
+    bin.install("genstats")
+    man.install("genstats.1")
   end
 
-  def test
-    # TODO(dan): be more thorough
-    system "genstats -h | grep folkert@vanheusden.com"
+  test do
+    system "#{bin}/genstats -h | grep folkert@vanheusden.com"
   end
 end
-__END__
-diff --git a/br.h b/br.h
-index addf8bc..dfdb5d4 100644
---- a/br.h
-+++ b/br.h
-@@ -8,6 +8,14 @@
- #define likely(x)       __builtin_expect((x),1)
- #define unlikely(x)     __builtin_expect((x),0)
- 
-+#ifdef __APPLE__
-+/* See http://fixunix.com/bsd/539901-definition-off64_t.html */
-+typedef off_t off64_t;
-+/* See http://lists.apple.com/archives/unix-porting/2002/Jul/msg00099.html */
-+#define lseek64 lseek
-+#define open64 open
-+#endif
-+
- class buffered_reader
-   {
- private:

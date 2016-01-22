@@ -1,16 +1,16 @@
-require 'formula'
-
 class Ispc < Formula
-  homepage 'http://ispc.github.com'
-  url 'https://github.com/downloads/ispc/ispc/ispc-v1.3.0-osx.tar.gz'
-  version '1.3.0'
-  sha1 'ec60f9e08405b6160b98aefd8cb4f9f7ee07c12e'
+  desc "Compiler for SIMD programming on the CPU"
+  homepage "https://ispc.github.io"
+  url "https://downloads.sourceforge.net/project/ispcmirror/v1.8.2/ispc-v1.8.2-osx.tar.gz"
+  sha256 "9e42d7cca73e598d26727e4e5ab2f8b8e24d009fcb64424e566fa0f45329c2ec"
+
+  bottle :unneeded
 
   def install
-    bin.install 'ispc'
+    bin.install "ispc"
   end
 
-  def test
+  test do
     system "#{bin}/ispc", "-v"
   end
 end

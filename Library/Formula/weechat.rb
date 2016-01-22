@@ -1,73 +1,59 @@
-require 'formula'
-
 class Weechat < Formula
-  homepage 'http://www.weechat.org'
-  url 'http://www.weechat.net/files/src/weechat-0.4.0.tar.bz2'
-  sha1 'e4b891d9d3d68196f97d226f487c4a2382d59d99'
+  desc "Extensible IRC client"
+  homepage "https://www.weechat.org"
+  url "https://weechat.org/files/src/weechat-1.4.tar.gz"
+  sha256 "51859bf3b26ffeed95c0a3399167e6670e8240542c52772439fb9cade06857a5"
+  revision 1
 
-  depends_on 'cmake' => :build
-  depends_on 'gnutls'
-  depends_on 'libgcrypt'
-  depends_on 'guile' if build.include? 'guile'
-  depends_on 'aspell' if build.include? 'aspell'
-  depends_on 'lua' if build.include? 'lua'
+  head "https://github.com/weechat/weechat.git"
 
-  option 'lua', 'Build the lua module'
-  option 'perl', 'Build the perl module'
-  option 'ruby', 'Build the ruby module'
-  option 'guile', 'Build the guile module'
-  option 'python', 'Build the python module (requires framework Python)'
-  option 'aspell', 'Build the aspell module that checks your spelling'
+  bottle do
+    sha256 "982b4881af5e9c041eeace8d54d392aec31cb34899a2cc77ce2a4fa1db771d1c" => :el_capitan
+    sha256 "382b0c6bf65d13a26dfe21c6f229c9f8a1607b669ded33ee4e303c074f7e6c67" => :yosemite
+    sha256 "e69326f74dd167f31ed5c3423790b8cb639d12746e14afbca2d49f0781fee54b" => :mavericks
+  end
+
+  option "with-perl", "Build the perl module"
+  option "with-ruby", "Build the ruby module"
+  option "with-curl", "Build with brewed curl"
+
+  depends_on "cmake" => :build
+  depends_on "gnutls"
+  depends_on "libgcrypt"
+  depends_on "gettext"
+  depends_on "guile" => :optional
+  depends_on "aspell" => :optional
+  depends_on "lua" => :optional
+  depends_on :python => :optional
+  depends_on "curl" => :optional
 
   def install
-    # Remove all arch flags from the PERL_*FLAGS as we specify them ourselves.
-    # This messes up because the system perl is a fat binary with 32, 64 and PPC
-    # compiles, but our deps don't have that. Remove at v0.3.8, fixed in HEAD.
-    archs = %W[-arch ppc -arch i386 -arch x86_64].join('|')
-    inreplace  "src/plugins/perl/CMakeLists.txt",
-      'IF(PERL_FOUND)',
-      'IF(PERL_FOUND)' +
-      %Q{\n  STRING(REGEX REPLACE "#{archs}" "" PERL_CFLAGS "${PERL_CFLAGS}")} +
-      %Q{\n  STRING(REGEX REPLACE "#{archs}" "" PERL_LFLAGS "${PERL_LFLAGS}")}
+    args = std_cmake_args
 
-    # FindPython.cmake queries the Python variable LINKFORSHARED which contains
-    # a path that only exists during Python install when using HB framework
-    # Python.  So remove that and use what's common in every install of Python,
-    # namely -u _PyMac_Error.  Without the invalid path, it links okay.
-    # Because Macports and Apple change LINKFORSHARED but HB does not, this
-    # will have to persist, and it's not reported upstream.  Fixes the error
-    #   no such file or directory: 'Python.framework/Versions/2.7/Python'
-    inreplace 'src/plugins/python/CMakeLists.txt',
-      '${PYTHON_LFLAGS}', '-u _PyMac_Error'
+    args << "-DENABLE_LUA=OFF" if build.without? "lua"
+    args << "-DENABLE_PERL=OFF" if build.without? "perl"
+    args << "-DENABLE_RUBY=OFF" if build.without? "ruby"
+    args << "-DENABLE_ASPELL=OFF" if build.without? "aspell"
+    args << "-DENABLE_GUILE=OFF" if build.without? "guile"
+    args << "-DENABLE_PYTHON=OFF" if build.without? "python"
+    args << "-DENABLE_JAVASCRIPT=OFF"
 
-    args = std_cmake_args + %W[
-      -DPREFIX=#{prefix}
-      -DENABLE_GTK=OFF
-    ]
-    args << '-DENABLE_LUA=OFF'    unless build.include? 'lua'
-    args << '-DENABLE_PERL=OFF'   unless build.include? 'perl'
-    args << '-DENABLE_RUBY=OFF'   unless build.include? 'ruby'
-    args << '-DENABLE_PYTHON=OFF' unless build.include? 'python'
-    args << '-DENABLE_ASPELL=OFF' unless build.include? 'aspell'
-    args << '-DENABLE_GUILE=OFF'  unless build.include? 'guile' and \
-                                         Formula.factory('guile').linked_keg.exist?
-
-    # NLS/gettext support disabled for now since it doesn't work in stdenv
-    # see https://github.com/mxcl/homebrew/issues/18722
-    args << "-DENABLE_NLS=OFF"
-    args << '..'
-
-    mkdir 'build' do
-      system 'cmake', *args
-      system 'make install'
+    mkdir "build" do
+      system "cmake", "..", *args
+      system "make", "install"
     end
   end
 
   def caveats; <<-EOS.undent
-      Weechat can depend on Aspell if you choose the --aspell option, but
+      Weechat can depend on Aspell if you choose the --with-aspell option, but
       Aspell should be installed manually before installing Weechat so that
       you can choose the dictionaries you want.  If Aspell was installed
       automatically as part of weechat, there won't be any dictionaries.
     EOS
+  end
+
+  test do
+    ENV["TERM"] = "xterm"
+    system "weechat", "-r", "/quit"
   end
 end

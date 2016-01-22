@@ -1,22 +1,17 @@
-require 'formula'
-
-class RedoDocs < Formula
-  head 'https://github.com/apenwarr/redo.git', :branch => 'man'
-  version 'foo'
-end
-
 class Redo < Formula
-  homepage 'https://github.com/apenwarr/redo'
+  desc "Implements djb's redo: an alternative to make(1)"
+  homepage "https://github.com/apenwarr/redo"
   url "https://github.com/apenwarr/redo/archive/redo-0.11.tar.gz"
-  sha1 '8b26d7c694b91a85d3f252e4ad85ca740ff0babd'
+  sha256 "2d7743e1389b538e2bd06117779204058fc0fcc0e05fd5ae14791d7f3fc3bcfa"
+
+  resource "docs" do
+    url "https://github.com/apenwarr/redo.git", :branch => "man"
+  end
 
   def install
-    ENV['PREFIX'] = prefix
+    ENV["PREFIX"] = prefix
     system "./redo install"
-    rm share+'doc/redo/README.md' # lets not have two copies
-
-    RedoDocs.new('redodocs').brew do
-      man1.install Dir['*']
-    end
+    rm share/"doc/redo/README.md" # lets not have two copies
+    man1.install resource("docs")
   end
 end

@@ -1,54 +1,36 @@
-require 'formula'
-
 class Vifm < Formula
-  homepage 'http://vifm.sourceforge.net/index.html'
-  url 'http://sourceforge.net/projects/vifm/files/vifm-0.7.3a.tar.bz2'
-  sha1 '4056b5bdc496f81225ddc7ee796380beb72a43da'
+  desc "Ncurses based file manager with vi like keybindings"
+  homepage "https://vifm.info/"
+  url "https://downloads.sourceforge.net/project/vifm/vifm/vifm-0.8.1.tar.bz2"
+  mirror "https://github.com/vifm/vifm/releases/download/v0.8.1/vifm-0.8.1.tar.bz2"
+  sha256 "9918ac96290f9bb2da0fdbd6e579af19de32d9eca41d0ceb5e2cb7cf08ebc379"
 
-  # OS X provides "ncurses" not "ncursesw"
-  def patches
-    DATA
+  bottle do
+    sha256 "88710cadc4638de655ad4e6522261a3af830c12284456f8915131dbb7b26f756" => :el_capitan
+    sha256 "51f32cb0303c43edb4f7c903b3b5c5a43caf5dcd06e411984959cbdfee4f1954" => :yosemite
+    sha256 "ad8ed5f68b7f5a73794e93c7402dee41178384b9c43ebe05e85d73fb99617123" => :mavericks
+  end
+
+  head do
+    url "https://github.com/vifm/vifm.git"
+    depends_on "automake" => :build
+    depends_on "autoconf" => :build
   end
 
   def install
-    system "./configure", "--disable-dependency-tracking",
-                          "--prefix=#{prefix}"
-    system "make install"
+    args = %W[--disable-dependency-tracking --prefix=#{prefix}]
+    if build.head?
+      system "./autogen.sh", *args
+    else
+      system "./configure", *args
+    end
+
+    ENV.deparallelize
+    system "make", "install"
+  end
+
+  test do
+    assert_match /^Version: #{Regexp.escape(version)}/,
+      shell_output("#{bin}/vifm --version")
   end
 end
-
-__END__
-diff --git a/configure b/configure
-index 16a10f5..0d77a28 100755
---- a/configure
-+++ b/configure
-@@ -13307,13 +13307,13 @@ if test "${with_curses+set}" = set; then :
- fi
- 
- 
--{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for initscr in -lncursesw" >&5
--$as_echo_n "checking for initscr in -lncursesw... " >&6; }
-+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for initscr in -lncurses" >&5
-+$as_echo_n "checking for initscr in -lncurses... " >&6; }
- if ${ac_cv_lib_ncursesw_initscr+:} false; then :
-   $as_echo_n "(cached) " >&6
- else
-   ac_check_lib_save_LIBS=$LIBS
--LIBS="-lncursesw  $LIBS"
-+LIBS="-lncurses  $LIBS"
- cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
- 
-@@ -13344,9 +13344,9 @@ fi
- { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ncursesw_initscr" >&5
- $as_echo "$ac_cv_lib_ncursesw_initscr" >&6; }
- if test "x$ac_cv_lib_ncursesw_initscr" = xyes; then :
--  LIBS="$LIBS -lncursesw"
--	if test x$vifm_cv_curses = x/usr -a -d /usr/include/ncursesw; then
--		CPPFLAGS="$CPPFLAGS -I/usr/include/ncursesw"
-+  LIBS="$LIBS -lncurses"
-+	if test x$vifm_cv_curses = x/usr -a -d /usr/include/ncurses; then
-+		CPPFLAGS="$CPPFLAGS -I/usr/include/ncurses"
- 	fi
- 	for ac_header in ncurses.h
- do :

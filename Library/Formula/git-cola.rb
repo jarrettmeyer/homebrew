@@ -1,35 +1,32 @@
-require 'formula'
-
 class GitCola < Formula
-  homepage 'http://git-cola.github.io/'
-  url 'https://github.com/git-cola/git-cola/archive/v1.8.2.tar.gz'
-  sha1 '92c09bcf3abcac68f6dc0817e9c8d002260572ae'
+  desc "Highly caffeinated git GUI"
+  homepage "https://git-cola.github.io/"
+  url "https://github.com/git-cola/git-cola/archive/v2.4.tar.gz"
+  sha256 "ef735431a2e58bac7671c4b9ab4fbb369195b16987fe9d3d931a9097c06c7f36"
+  head "https://github.com/git-cola/git-cola.git"
 
-  head 'https://github.com/git-cola/git-cola.git'
-
-  option 'with-docs', "Build man pages using asciidoc and xmlto"
-
-  depends_on 'pyqt'
-
-  if build.include? 'with-docs'
-    # these are needed to build man pages
-    depends_on 'asciidoc'
-    depends_on 'xmlto'
+  bottle do
+    cellar :any_skip_relocation
+    sha256 "1d9b0f0b7df97b5e37fdf2b548f297aca05d303b4b27e66a81bd2972a9164163" => :el_capitan
+    sha256 "0e307cb96047b9448bc531188fb8f44831074647a95819d5de76c59b4c4fb9fa" => :yosemite
+    sha256 "3c1cde2b3b70661603f9eb94d3d0560ceaf27b11b98edb2b68b3bf524c444751" => :mavericks
   end
 
+  option "with-docs", "Build manpages and HTML docs"
+
+  depends_on "pyqt"
+  depends_on "sphinx-doc" => :build if build.with? "docs"
+
   def install
-    ENV.prepend 'PYTHONPATH', "#{HOMEBREW_PREFIX}/lib/#{which_python}/site-packages", ':'
     system "make", "prefix=#{prefix}", "install"
 
-    if build.include? 'with-docs'
-      system "make", "-C", "share/doc/git-cola",
-                     "-f", "Makefile.asciidoc",
-                     "prefix=#{prefix}",
-                     "install", "install-html"
+    if build.with? "docs"
+      system "make", "install-doc", "prefix=#{prefix}",
+             "SPHINXBUILD=#{Formula["sphinx-doc"].opt_bin}/sphinx-build"
     end
   end
 
-  def which_python
-    "python" + `python -c 'import sys;print(sys.version[:3])'`.strip
+  test do
+    system "#{bin}/git-cola", "--version"
   end
 end

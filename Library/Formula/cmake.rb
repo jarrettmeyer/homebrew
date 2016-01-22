@@ -1,55 +1,67 @@
-require 'formula'
-
-class NoExpatFramework < Requirement
-  def expat_framework
-    '/Library/Frameworks/expat.framework'
-  end
-
-  satisfy :build_env => false do
-    not File.exist? expat_framework
-  end
-
-  def message; <<-EOS.undent
-    Detected #{expat_framework}
-
-    This will be picked up by CMake's build system and likely cause the
-    build to fail, trying to link to a 32-bit version of expat.
-
-    You may need to move this file out of the way to compile CMake.
-    EOS
-  end
-end
-
 class Cmake < Formula
-  homepage 'http://www.cmake.org/'
-  url 'http://www.cmake.org/files/v2.8/cmake-2.8.10.2.tar.gz'
-  sha1 '2d868ccc3f9f2aa7c2844bd0a4609d5313edaaec'
+  desc "Cross-platform make"
+  homepage "https://www.cmake.org/"
+  url "https://cmake.org/files/v3.4/cmake-3.4.1.tar.gz"
+  sha256 "d41462bdd80dc37f0d5608167b354bb3af8c068eee640be04c907154c5c113e2"
+  head "https://cmake.org/cmake.git"
 
   bottle do
-    sha1 '0bdd4bfd4a094d3fbacbe33d0968161a0f24d665' => :mountain_lion
-    sha1 '340f321eed8fd6b423980ecf9bed90646fc9331c' => :lion
-    sha1 'c23c8c6124c1d59817301678cabad9517966d899' => :snow_leopard
+    cellar :any_skip_relocation
+    sha256 "34257a08a944ecdf27fa15b7a12a59a3d6f844eee1612b139cb8d98f15025d7d" => :el_capitan
+    sha256 "5ff7e68c06ad6556b3f1440f992ea37af457ff7a998e59e2cf83cdda9119c0a4" => :yosemite
+    sha256 "f507463c578d2b34713e28d843b530f7787631bdd009084db6cbdef8ea9cc6f9" => :mavericks
   end
 
-  depends_on NoExpatFramework
+  option "without-docs", "Don't build man pages"
+  option "with-completion", "Install Bash completion (Has potential problems with system bash)"
+
+  depends_on "sphinx-doc" => :build if build.with? "docs"
+
+  # The `with-qt` GUI option was removed due to circular dependencies if
+  # CMake is built with Qt support and Qt is built with MySQL support as MySQL uses CMake.
+  # For the GUI application please instead use brew install caskroom/cask/cmake.
 
   def install
     args = %W[
       --prefix=#{prefix}
-      --system-libs
-      --no-system-libarchive
+      --no-system-libs
+      --parallel=#{ENV.make_jobs}
       --datadir=/share/cmake
       --docdir=/share/doc/cmake
       --mandir=/share/man
+      --system-zlib
+      --system-bzip2
     ]
+
+    # https://github.com/Homebrew/homebrew/issues/45989
+    if MacOS.version <= :lion
+      args << "--no-system-curl"
+    else
+      args << "--system-curl"
+    end
+
+    if build.with? "docs"
+      # There is an existing issue around OS X & Python locale setting
+      # See https://bugs.python.org/issue18378#msg215215 for explanation
+      ENV["LC_ALL"] = "en_US.UTF-8"
+      args << "--sphinx-man" << "--sphinx-build=#{Formula["sphinx-doc"].opt_bin}/sphinx-build"
+    end
 
     system "./bootstrap", *args
     system "make"
-    system "make install"
+    system "make", "install"
+
+    if build.with? "completion"
+      cd "Auxiliary/bash-completion/" do
+        bash_completion.install "ctest", "cmake", "cpack"
+      end
+    end
+
+    (share/"emacs/site-lisp/cmake").install "Auxiliary/cmake-mode.el"
   end
 
   test do
-    File.open('CMakeLists.txt', 'w') {|f| f.write('find_package(Ruby)') }
-    system "#{bin}/cmake", '.'
+    (testpath/"CMakeLists.txt").write("find_package(Ruby)")
+    system "#{bin}/cmake", "."
   end
 end

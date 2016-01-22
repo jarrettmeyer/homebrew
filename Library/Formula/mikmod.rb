@@ -1,20 +1,25 @@
-require 'formula'
-
 class Mikmod < Formula
-  homepage 'http://mikmod.raphnet.net/'
-  url 'http://mikmod.shlomifish.org/files/mikmod-3.2.2.tar.gz'
-  sha1 '37640492c0ba3aebc277a251e1d012119e2edee8'
+  desc "Portable tracked music player"
+  homepage "http://mikmod.raphnet.net/"
+  url "https://downloads.sourceforge.net/project/mikmod/mikmod/3.2.6/mikmod-3.2.6.tar.gz"
+  sha256 "04544e0edb36a19fab61233dff97430969cff378a98f5989a1378320550e2673"
 
-  depends_on 'libmikmod'
+  bottle do
+    sha256 "759d6d16ac5743599942b67695b3aca27996f40b96e61210905f0bfdfc4c48a7" => :mavericks
+    sha256 "377735f1553d44e6f02a6dc92742a0c0c84546a7085c3a1839488ae26a9f280a" => :mountain_lion
+    sha256 "ab3e1ab1d55c3f2197db079a0f05570ac95602ebbde179ca43be83b65d51a3aa" => :lion
+  end
+
+  depends_on "libmikmod"
 
   def install
     system "./configure", "--disable-debug", "--disable-dependency-tracking",
                           "--prefix=#{prefix}",
                           "--mandir=#{man}"
-    system "make install"
+    system "make", "install"
   end
 
-  def test
+  test do
     system "#{bin}/mikmod", "-V"
   end
 end

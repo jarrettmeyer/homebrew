@@ -1,12 +1,18 @@
-require 'formula'
-
 class Renameutils < Formula
-  homepage 'http://www.nongnu.org/renameutils/'
-  url 'http://download.savannah.gnu.org/releases/renameutils/renameutils-0.12.0.tar.gz'
-  sha1 '8c6edae4ee374330a01a95257fd552b5cb7540bc'
+  desc "Tools for file renaming"
+  homepage "http://www.nongnu.org/renameutils/"
+  url "http://download.savannah.gnu.org/releases/renameutils/renameutils-0.12.0.tar.gz"
+  sha256 "cbd2f002027ccf5a923135c3f529c6d17fabbca7d85506a394ca37694a9eb4a3"
 
-  depends_on 'readline' # Use instead of system libedit
-  depends_on 'coreutils'
+  bottle do
+    cellar :any
+    sha256 "cd3327f073ba1c67da113906854727e806829a9dc4f9abaaa516ab80c2981571" => :yosemite
+    sha256 "3f0ffe1f0d2d66032657e1281b796d6f71cdac36b9a0ae7ad1e8ef5df267d3de" => :mavericks
+    sha256 "6ac784f69ad72c25a17eafbd85fc7e66fa5285c834f1adb08f3943fa1d4ed48c" => :mountain_lion
+  end
+
+  depends_on "readline" # Use instead of system libedit
+  depends_on "coreutils"
 
   # Use the GNU versions of certain system utilities. See:
   # https://trac.macports.org/ticket/24525
@@ -14,7 +20,10 @@ class Renameutils < Formula
   # The fourth patch is new and fixes a Makefile syntax error that causes
   # make install to fail.  Reported upstream via email and fixed in HEAD.
   # Remove patch #4 at version > 0.12.0.  The first three should persist.
-  def patches; DATA; end
+  patch :DATA
+
+  conflicts_with "ipmiutil", :because => "both install `icmd` binaries"
+  conflicts_with "irods", :because => "both install `icp` and `imv` binaries"
 
   def install
     system "./configure", "--disable-dependency-tracking",
@@ -22,7 +31,13 @@ class Renameutils < Formula
                           "--with-packager=Homebrew"
     system "make"
     ENV.deparallelize # parallel install fails
-    system "make install"
+    system "make", "install"
+  end
+
+  test do
+    (testpath/"test.txt").write ("Hello World!")
+    pipe_output("#{bin}/icp test.txt", ".2\n")
+    assert_equal File.read("test.txt"), File.read("test.txt.2")
   end
 end
 

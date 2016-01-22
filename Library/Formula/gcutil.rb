@@ -1,16 +1,17 @@
-require 'formula'
-
 class Gcutil < Formula
-  homepage 'https://developers.google.com/compute/docs/gcutil/'
-  url 'https://google-compute-engine-tools.googlecode.com/files/gcutil-1.7.2.tar.gz'
-  sha1 '8bcff6426b107d54873844d73d4af22a3dc89155'
+  desc "Manage your Google Compute Engine resources"
+  homepage "https://cloud.google.com/compute/docs/gcutil/"
+  url "https://dl.google.com/dl/cloudsdk/release/artifacts/gcutil-1.16.1.zip"
+  sha256 "31f438c9ce3471f1404340e3411239b28b63f117d17776271fee1e1a352f3877"
+
+  bottle :unneeded
 
   def install
-    libexec.install 'gcutil', 'lib'
+    libexec.install "gcutil", "lib"
     bin.install_symlink libexec/"gcutil"
   end
 
-  def test
+  test do
     system "#{bin}/gcutil", "version"
   end
 end

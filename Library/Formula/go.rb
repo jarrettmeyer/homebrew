@@ -1,96 +1,124 @@
-require 'formula'
-
 class Go < Formula
-  homepage 'http://golang.org'
-  url 'http://go.googlecode.com/files/go1.0.3.src.tar.gz'
-  version '1.0.3'
-  sha1 '1a67293c10d6c06c633c078a7ca67e98c8b58471'
-  head 'https://go.googlecode.com/hg/'
+  desc "Go programming environment"
+  homepage "https://golang.org"
+  url "https://storage.googleapis.com/golang/go1.5.3.src.tar.gz"
+  mirror "https://fossies.org/linux/misc/go1.5.3.src.tar.gz"
+  version "1.5.3"
+  sha256 "754e06dab1c31ab168fc9db9e32596734015ea9e24bc44cae7f237f417ce4efe"
 
-  skip_clean 'bin'
+  head "https://github.com/golang/go.git"
 
-  option 'cross-compile-all', "Build the cross-compilers and runtime support for all supported platforms"
-  option 'cross-compile-common', "Build the cross-compilers and runtime support for darwin, linux and windows"
-
-  devel do
-    url 'https://go.googlecode.com/files/go1.1beta2.src.tar.gz'
-    version '1.1beta2'
-    sha1 '70d7642a6ea065a23458b9ea28e370b19912e52d'
+  bottle do
+    sha256 "b09e84e2e63314ab38d76c366ff13afa53106ec2e53987c2e75d9e591848121e" => :el_capitan
+    sha256 "9553fcf68bcd70e75ab755785f5dd6285f3608e2e71324c3ba1a4f736c84a8c9" => :yosemite
+    sha256 "ccce62ff1470060646749876b79d33d3092f60de8409bb5fd02e7412aa4aff72" => :mavericks
   end
 
-  unless build.stable?
-    fails_with :clang do
-      cause "clang: error: no such file or directory: 'libgcc.a'"
+  devel do
+    url "https://storage.googleapis.com/golang/go1.6beta2.src.tar.gz"
+    version "1.6beta2"
+    sha256 "8b23d15a3edf1d154ceea5e9ca6370fc60e7f57fb1c28aa8a44c40f8f3167c6d"
+  end
+
+  option "without-cgo", "Build without cgo"
+  option "without-godoc", "godoc will not be installed for you"
+  option "without-vet", "vet will not be installed for you"
+
+  resource "gotools" do
+    url "https://go.googlesource.com/tools.git",
+    :revision => "d02228d1857b9f49cd0252788516ff5584266eb6"
+  end
+
+  resource "gobootstrap" do
+    if MacOS.version > :lion
+      url "https://storage.googleapis.com/golang/go1.4.2.darwin-amd64-osx10.8.tar.gz"
+      sha256 "c2f53983fc8fe5159d811081022ebc401b8111759ce008f91193abdae82cdbc9"
+    else
+      url "https://storage.googleapis.com/golang/go1.4.2.darwin-amd64-osx10.6.tar.gz"
+      sha256 "da40e85a2c9bda9d2c29755c8b57b8d5932440ba466ca366c2a667697a62da4c"
     end
   end
 
   def install
-    # install the completion scripts
-    (prefix/'etc/bash_completion.d').install 'misc/bash/go' => 'go-completion.bash'
-    (share/'zsh/site-functions').install 'misc/zsh/go' => '_go'
+    # GOROOT_FINAL must be overidden later on real Go install
+    ENV["GOROOT_FINAL"] = buildpath/"gobootstrap"
 
-    if build.include? 'cross-compile-all'
-      targets = [
-        ['linux',   ['386', 'amd64', 'arm'], { :cgo => false }],
-        ['freebsd', ['386', 'amd64'],        { :cgo => false }],
+    # build the gobootstrap toolchain Go >=1.4
+    (buildpath/"gobootstrap").install resource("gobootstrap")
+    cd "#{buildpath}/gobootstrap/src" do
+      system "./make.bash", "--no-clean"
+    end
+    # This should happen after we build the test Go, just in case
+    # the bootstrap toolchain is aware of this variable too.
+    ENV["GOROOT_BOOTSTRAP"] = ENV["GOROOT_FINAL"]
 
-        ['openbsd', ['386', 'amd64'],        { :cgo => false }],
-
-        ['windows', ['386', 'amd64'],        { :cgo => false }],
-
-        # Host platform (darwin/amd64) must always come last
-        ['darwin',  ['386', 'amd64'],        { :cgo => true  }],
-      ]
-    elsif build.include? 'cross-compile-common'
-      targets = [
-        ['linux',   ['386', 'amd64', 'arm'], { :cgo => false }],
-        ['windows', ['386', 'amd64'],        { :cgo => false }],
-
-        # Host platform (darwin/amd64) must always come last
-        ['darwin',  ['386', 'amd64'],        { :cgo => true  }],
-      ]
-    else
-      targets = [
-        ['darwin', [''], { :cgo => true }]
-      ]
+    cd "src" do
+      ENV["GOROOT_FINAL"] = libexec
+      ENV["GOOS"]         = "darwin"
+      ENV["CGO_ENABLED"]  = build.with?("cgo") ? "1" : "0"
+      system "./make.bash", "--no-clean"
     end
 
-    # The version check is due to:
-    # http://codereview.appspot.com/5654068
-    Pathname.new('VERSION').write 'default' if build.head?
+    (buildpath/"pkg/obj").rmtree
+    rm_rf "gobootstrap" # Bootstrap not required beyond compile.
+    libexec.install Dir["*"]
+    bin.install_symlink Dir["#{libexec}/bin/go*"]
 
-    cd 'src' do
-      # Build only. Run `brew test go` to run distrib's tests.
-      targets.each do |(os, archs, opts)|
-      archs.each do |arch|
-        ENV['GOROOT_FINAL'] = prefix
-        ENV['GOOS']         = os
-        ENV['GOARCH']       = arch
-        ENV['CGO_ENABLED']  = opts[:cgo] ? "1" : "0"
-        allow_fail = opts[:allow_fail] ? "|| true" : ""
-        system "./make.bash --no-clean #{allow_fail}"
+    if build.with?("godoc") || build.with?("vet")
+      ENV.prepend_path "PATH", bin
+      ENV["GOPATH"] = buildpath
+      (buildpath/"src/golang.org/x/tools").install resource("gotools")
+
+      if build.with? "godoc"
+        cd "src/golang.org/x/tools/cmd/godoc/" do
+          system "go", "build"
+          (libexec/"bin").install "godoc"
+        end
+        bin.install_symlink libexec/"bin/godoc"
       end
+
+      if build.with? "vet"
+        cd "src/golang.org/x/tools/cmd/vet/" do
+          system "go", "build"
+          # This is where Go puts vet natively; not in the bin.
+          (libexec/"pkg/tool/darwin_amd64/").install "vet"
+        end
       end
     end
+  end
 
-    # cleanup ENV
-    ENV.delete('GOROOT_FINAL')
-    ENV.delete('GOOS')
-    ENV.delete('GOARCH')
-    ENV.delete('CGO_ENABLED')
+  def caveats; <<-EOS.undent
+    As of go 1.2, a valid GOPATH is required to use the `go get` command:
+      https://golang.org/doc/code.html#GOPATH
 
-    Pathname.new('pkg/obj').rmtree
-
-    # Don't install header files; they aren't necessary and can
-    # cause problems with other builds. See:
-    # http://trac.macports.org/ticket/30203
-    # http://code.google.com/p/go/issues/detail?id=2407
-    prefix.install(Dir['*'] - ['include'])
+    You may wish to add the GOROOT-based install location to your PATH:
+      export PATH=$PATH:#{opt_libexec}/bin
+    EOS
   end
 
   test do
-    cd "#{prefix}/src" do
-      system "./run.bash", "--no-rebuild"
+    (testpath/"hello.go").write <<-EOS.undent
+    package main
+
+    import "fmt"
+
+    func main() {
+        fmt.Println("Hello World")
+    }
+    EOS
+    # Run go fmt check for no errors then run the program.
+    # This is a a bare minimum of go working as it uses fmt, build, and run.
+    system "#{bin}/go", "fmt", "hello.go"
+    assert_equal "Hello World\n", shell_output("#{bin}/go run hello.go")
+
+    if build.with? "godoc"
+      assert File.exist?(libexec/"bin/godoc")
+      assert File.executable?(libexec/"bin/godoc")
+    end
+
+    if build.with? "vet"
+      assert File.exist?(libexec/"pkg/tool/darwin_amd64/vet")
+      assert File.executable?(libexec/"pkg/tool/darwin_amd64/vet")
     end
   end
 end

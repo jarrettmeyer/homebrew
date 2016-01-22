@@ -1,12 +1,14 @@
-require 'formula'
-
 class Repo < Formula
-  homepage 'http://source.android.com/source/git-repo.html'
-  url 'http://git-repo.googlecode.com/files/repo-1.19'
-  version '1.19'
-  sha1 'e48d46e36194859fe8565e8cbdf4c5d1d8768ef3'
+  desc "Repository tool for Android development"
+  homepage "https://source.android.com/source/developing.html"
+  url "https://gerrit.googlesource.com/git-repo.git",
+      :tag => "v1.12.32",
+      :revision => "745b4ad660f8050045b521c4e15b7d3ac0b3d70e"
+  version "1.22"
+
+  bottle :unneeded
 
   def install
-    bin.install "repo-#{version}" => 'repo'
+    bin.install "repo"
   end
 end

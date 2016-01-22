@@ -1,30 +1,50 @@
-require 'formula'
-
 class Dpkg < Formula
-  homepage 'http://en.wikipedia.org/wiki/Dpkg'
-  url 'http://ftp.debian.org/debian/pool/main/d/dpkg/dpkg_1.15.8.13.tar.bz2'
-  sha1 'd0b9386742f966345a23c3daa0391b37fa837a3f'
+  desc "Debian package management system"
+  homepage "https://wiki.debian.org/Teams/Dpkg"
+  url "https://mirrors.ocf.berkeley.edu/debian/pool/main/d/dpkg/dpkg_1.18.3.tar.xz"
+  mirror "https://mirrorservice.org/sites/ftp.debian.org/debian/pool/main/d/dpkg/dpkg_1.18.3.tar.xz"
+  sha256 "a40ffe38d7f36d858a752189a306433cfc52c7d15d7b98f61d9f9dd49e0e4807"
 
-  depends_on 'pkg-config' => :build
-  depends_on 'gnu-tar'
-
-  fails_with :clang do
-    cause 'cstdlib:142:3: error: declaration conflicts with target of using declaration already in scope'
+  bottle do
+    sha256 "a75ff82d4c12df36a0c14b3b0d0ffd3dd5a984141ee5148f83cfbb124e167e9f" => :el_capitan
+    sha256 "dfeb8b88f4802bffcdf5effa72602252bed2e9394c3e285b403beda9127ab024" => :yosemite
+    sha256 "03d0aa6f0c97835ca906134d0b0f555481e1fc3f03a6dfae88c27fb1c7451b54" => :mavericks
   end
 
-  # Fixes the PERL_LIBDIR.
-  # Uses Homebrew-install gnu-tar instead of bsd tar.
-  def patches; DATA; end
+  depends_on "pkg-config" => :build
+  depends_on "gnu-tar"
+  depends_on "xz" # For LZMA
 
   def install
+    # We need to specify a recent gnutar, otherwise various dpkg C programs will
+    # use the system "tar", which will fail because it lacks certain switches.
+    ENV["TAR"] = Formula["gnu-tar"].opt_bin/"gtar"
+
+    # Theoretically, we could reinsert a patch here submitted upstream previously
+    # but the check for PERL_LIB remains in place and incompatible with Homebrew.
+    # Using an env and scripting is a solution less likely to break over time.
+    # Both variables need to be set. One is compile-time, the other run-time.
+    ENV["PERL_LIBDIR"] = libexec/"lib/perl5"
+    ENV.prepend_create_path "PERL5LIB", libexec+"lib/perl5"
+
     system "./configure", "--disable-dependency-tracking",
-                          "--prefix=#{prefix}",
-                          "--disable-compiler-warnings",
+                          "--disable-silent-rules",
+                          "--prefix=#{libexec}",
+                          "--sysconfdir=#{etc}",
+                          "--localstatedir=#{var}",
+                          "--disable-dselect",
                           "--disable-linker-optimisations",
-                          "--disable-compiler-optimisations",
-                          "--without-start-stop-daemon"
+                          "--disable-start-stop-daemon"
     system "make"
-    system "make install"
+    system "make", "install"
+
+    bin.install Dir["#{libexec}/bin/*"]
+    man.install Dir["#{libexec}/share/man/*"]
+    bin.env_script_all_files(libexec+"bin", :PERL5LIB => ENV["PERL5LIB"])
+
+    (buildpath/"dummy").write "Vendor: dummy\n"
+    (etc/"dpkg/origins").install "dummy"
+    (etc/"dpkg/origins").install_symlink "dummy" => "default"
   end
 
   def caveats; <<-EOS.undent
@@ -32,36 +52,27 @@ class Dpkg < Formula
     commands such as `dpkg -i`, `dpkg --configure` will fail.
     EOS
   end
-end
 
-__END__
-diff --git a/configure b/configure
-index a4e8516..de7f226 100755
---- a/configure
-+++ b/configure
-@@ -8180,9 +8180,9 @@ else
- $as_echo "no" >&6; }
- fi
- 
--PERL_LIBDIR=$($PERL -MConfig -e 'my $r = $Config{vendorlibexp};
--                                 $r =~ s/$Config{vendorprefixexp}/\$(prefix)/;
--                                 print $r')
-+PERL_LIBDIR=$($PERL -MConfig -e 'my $r = $Config{sitelib}; 
-+                                 $r =~ s/$Config{sitelib}/\$(prefix)/;
-+                                 print $r')
- 
- for ac_prog in pod2man
- do
-diff --git a/lib/dpkg/dpkg.h b/lib/dpkg/dpkg.h
-index ba6066c..89a66ba 100644
---- a/lib/dpkg/dpkg.h
-+++ b/lib/dpkg/dpkg.h
-@@ -97,7 +97,7 @@
- #define DPKG  	"dpkg"
- #define DEBSIGVERIFY	"/usr/bin/debsig-verify"
- 
--#define TAR		"tar"
-+#define TAR		"gnutar"
- #define RM		"rm"
- #define FIND		"find"
- #define DIFF		"diff"
+  test do
+    # Do not remove the empty line from the end of the control file
+    # All deb control files MUST end with an empty line
+    (testpath/"test/data/homebrew.txt").write <<-EOS.undent
+      Homebrew was here.
+    EOS
+
+    (testpath/"test/DEBIAN/control").write <<-EOS.undent
+      Package: test
+      Version: 1.40.99
+      Architecture: amd64
+      Description: I am a test
+      Maintainer: Dpkg Developers <test@test.org>
+
+    EOS
+    system bin/"dpkg", "-b", testpath/"test", "test.deb"
+    assert File.exist?("test.deb")
+
+    rm_rf "test"
+    system bin/"dpkg", "-x", "test.deb", testpath
+    assert File.exist?("data/homebrew.txt")
+  end
+end

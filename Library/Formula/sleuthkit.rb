@@ -1,29 +1,56 @@
-require 'formula'
-
 class Sleuthkit < Formula
-  homepage 'http://www.sleuthkit.org/'
-  url 'http://downloads.sourceforge.net/project/sleuthkit/sleuthkit/4.0.2/sleuthkit-4.0.2.tar.gz'
-  sha1 'e5394d53eb07615e6e78ff7fa73340cc6f6e98d4'
+  desc "Forensic toolkit"
+  homepage "http://www.sleuthkit.org/"
+  url "https://github.com/sleuthkit/sleuthkit/archive/sleuthkit-4.2.0.tar.gz"
+  sha256 "d71414134c9f8ce8e193150dd478c063173ee7f3b01f8a2a5b18c09aaa956ba7"
+  head "https://github.com/sleuthkit/sleuthkit.git"
 
-  head 'https://github.com/sleuthkit/sleuthkit.git'
-
-  if build.head?
-    depends_on :autoconf
-    depends_on :automake
-    depends_on :libtool
+  bottle do
+    cellar :any
+    sha256 "9be1ac084cd2ca38dfcf8d74357954051f8253d2e9fdf2118d4539bd41697f2b" => :el_capitan
+    sha256 "a57e48483c05b733a9f67fba5759173b08fd89edd13ff5c83f504935ad556646" => :yosemite
+    sha256 "c548ffdfbd4f20693ca708a09355b47dd0d049e1ce249cac3aefe96148270b0f" => :mavericks
   end
 
-  depends_on 'afflib' => :optional
-  depends_on 'libewf' => :optional
+  conflicts_with "irods", :because => "both install `ils`"
 
-  conflicts_with 'ffind',
+  option "with-jni", "Build Sleuthkit with JNI bindings"
+  option "with-debug", "Build debug version"
+
+  if build.with? "jni"
+    depends_on :java
+    depends_on :ant => :build
+  end
+
+  depends_on "autoconf" => :build
+  depends_on "automake" => :build
+  depends_on "libtool" => :build
+  depends_on "afflib" => :optional
+  depends_on "libewf" => :optional
+
+  conflicts_with "ffind",
     :because => "both install a 'ffind' executable."
 
   def install
-    system "./bootstrap" if build.head?
-    system "./configure", "--disable-debug", "--disable-dependency-tracking",
+    ENV.append_to_cflags "-DNDEBUG" if build.without? "debug"
+    ENV.java_cache if build.with? "jni"
+
+    system "./bootstrap"
+    system "./configure", "--disable-dependency-tracking",
+                          if build.without? "jni" then "--disable-java" end,
                           "--prefix=#{prefix}"
     system "make"
-    system "make install"
+    system "make", "install"
+
+    if build.with? "jni"
+      cd "bindings/java" do
+        system "ant"
+      end
+      prefix.install "bindings"
+    end
+  end
+
+  test do
+    system "#{bin}/tsk_loaddb", "-V"
   end
 end

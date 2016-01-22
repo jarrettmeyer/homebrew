@@ -1,15 +1,14 @@
-require 'formula'
-
 class Griffon < Formula
-  homepage 'http://griffon.codehaus.org/'
-  url 'http://dist.codehaus.org/griffon/griffon/1.1.x/griffon-1.1.0-bin.zip'
-  sha1 '3cb6ffa15a5bce3d3e7e2a56b210d9c40853b442'
+  desc "Application framework for desktop applications in the JVM"
+  homepage "http://griffon.codehaus.org/"
+  url "https://dl.bintray.com/content/aalmiray/Griffon/griffon-1.5.0-bin.tgz"
+  sha256 "3f7868e8d86f10e4a5a9139661465a0b89f2646ef93a553b9bdfb625356ef876"
+
+  bottle :unneeded
 
   def install
     rm_f Dir["bin/*.bat"]
-
-    prefix.install_metafiles
-    libexec.install Dir['*']
+    libexec.install Dir["*"]
     bin.install_symlink Dir["#{libexec}/bin/*"]
   end
 

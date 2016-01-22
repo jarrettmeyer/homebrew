@@ -1,29 +1,33 @@
-require 'formula'
-
 class Libqalculate < Formula
-  homepage 'http://qalculate.sourceforge.net/'
-  url 'http://sourceforge.net/projects/qalculate/files/libqalculate/libqalculate-0.9.7/libqalculate-0.9.7.tar.gz'
-  sha1 'c15f7f3a97995decf62cc964956fc1e374ecd78c'
+  desc "Library for Qalculate! program"
+  homepage "http://qalculate.sourceforge.net/"
+  url "https://downloads.sourceforge.net/project/qalculate/libqalculate/libqalculate-0.9.7/libqalculate-0.9.7.tar.gz"
+  sha256 "9a6d97ce3339d104358294242c3ecd5e312446721e93499ff70acc1604607955"
 
-  depends_on 'pkg-config' => :build
-  depends_on 'cln'
-  depends_on 'glib'
-  depends_on 'gnuplot'
-  depends_on 'gettext'
-  depends_on 'readline'
-  depends_on 'wget'
+  bottle do
+    sha256 "390c9565ed2b4cac2526641f10036a66e909da41af956a855b728010789e25ad" => :mavericks
+    sha256 "72a4cbfb0be5de621f926d146bd52be1028944c86da185959da00c2331367d86" => :mountain_lion
+  end
+
+  depends_on "pkg-config" => :build
+  depends_on "cln"
+  depends_on "glib"
+  depends_on "gnuplot"
+  depends_on "gettext"
+  depends_on "readline"
+  depends_on "wget"
 
   # Patches against version 0.9.7, should not be needed in the future
-  def patches; DATA; end
+  patch :DATA
 
   def install
     system "./configure", "--disable-debug", "--disable-dependency-tracking",
                           "--prefix=#{prefix}"
-    system "make install"
+    system "make", "install"
   end
 
-  def test
-    system "#{bin}/qalc", "(2+2)/4 hours to minutes"
+  test do
+    system "#{bin}/qalc", "-nocurrencies", "(2+2)/4 hours to minutes"
   end
 end
 

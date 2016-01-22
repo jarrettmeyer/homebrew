@@ -1,19 +1,26 @@
-require 'formula'
-
 class Siege < Formula
-  homepage 'http://www.joedog.org/index/siege-home'
-  url "http://www.joedog.org/pub/siege/siege-3.0.0.tar.gz"
-  sha1 'a044679fbe4a58b027a50735f6a4b2c12f6d2f2a'
+  desc "HTTP regression testing and benchmarking utility"
+  homepage "https://www.joedog.org/siege-home/"
+  url "http://download.joedog.org/siege/siege-3.1.3.tar.gz"
+  sha256 "4d3932ea23cbf6d1d22df7c7ee6e7a6bc9f591b604ab582393eeb62f393f5a33"
+
+  bottle do
+    sha256 "b6fd654eff78d2b326e8308f3c779300d2dbf034853d13dddeee26e36388497a" => :el_capitan
+    sha256 "1d794a569a64cc6158fabe7bf8940db6aa0f6153d50b2e71457bfc13e4918a24" => :yosemite
+    sha256 "a78857a335916fafa6bf143d428291dcff7057e061a99bc154aee35fd17b13e9" => :mavericks
+  end
+
+  depends_on "openssl"
 
   def install
     # To avoid unnecessary warning due to hardcoded path, create the folder first
-    (prefix+'etc').mkdir
+    (prefix/"etc").mkdir
     system "./configure", "--disable-dependency-tracking",
                           "--prefix=#{prefix}",
                           "--mandir=#{man}",
                           "--localstatedir=#{var}",
-                          "--with-ssl"
-    system "make install"
+                          "--with-ssl=#{Formula["openssl"].opt_prefix}"
+    system "make", "install"
   end
 
   def caveats; <<-EOS.undent
@@ -31,5 +38,9 @@ class Siege < Formula
 
     Run siege.config to create the ~/.siegerc config file.
     EOS
+  end
+
+  test do
+    system "#{bin}/siege", "--concurrent=1", "--reps=1", "https://www.google.com/"
   end
 end

@@ -1,16 +1,15 @@
-require 'formula'
-
 class Xmlstarlet < Formula
-  homepage 'http://xmlstar.sourceforge.net/'
-  url 'http://sourceforge.net/projects/xmlstar/files/xmlstarlet/1.4.2/xmlstarlet-1.4.2.tar.gz'
-  sha1 '432bd1bd2511369b7823e5731397744435a68f04'
+  desc "XML command-line utilities"
+  homepage "http://xmlstar.sourceforge.net/"
+  url "https://downloads.sourceforge.net/project/xmlstar/xmlstarlet/1.6.1/xmlstarlet-1.6.1.tar.gz"
+  sha256 "15d838c4f3375332fd95554619179b69e4ec91418a3a5296e7c631b7ed19e7ca"
 
   def install
     system "./configure", "--disable-dependency-tracking",
                           "--prefix=#{prefix}",
                           "--mandir=#{man}"
     system "make"
-    system "make install"
-    ln_s bin/'xml', bin/'xmlstarlet'
+    system "make", "install"
+    bin.install_symlink "xml" => "xmlstarlet"
   end
 end

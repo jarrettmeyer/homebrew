@@ -1,48 +1,65 @@
-require 'formula'
-
 class Pyside < Formula
-  homepage 'http://www.pyside.org'
-  url 'http://qt-project.org/uploads/pyside/pyside-qt4.8+1.1.2.tar.bz2'
-  mirror 'https://distfiles.macports.org/py-pyside/pyside-qt4.8+1.1.2.tar.bz2'
-  sha1 'c0119775f2500e48efebdd50b7be7543e71b2c24'
+  desc "Python bindings for Qt"
+  homepage "https://wiki.qt.io/PySide"
+  url "https://download.qt.io/official_releases/pyside/pyside-qt4.8+1.2.2.tar.bz2"
+  mirror "https://distfiles.macports.org/py-pyside/pyside-qt4.8+1.2.2.tar.bz2"
+  sha256 "a1a9df746378efe52211f1a229f77571d1306fb72830bbf73f0d512ed9856ae1"
+  revision 1
 
-  depends_on 'cmake' => :build
-  depends_on 'shiboken'
+  head "https://github.com/PySide/PySide.git"
 
-  def which_python
-    "python" + `python -c 'import sys;print(sys.version[:3])'`.strip
+  bottle do
+    sha256 "d1f7a38b75e85ebdbb73d15ecd4b2154b236c80a790f021c9f70f95bc839d926" => :el_capitan
+    sha256 "8c2463514cd2133b9237143ceb2d73e64f96ff162c5c302b28f894132ad88490" => :yosemite
+    sha256 "fbc427b84b145fe0fa0a2a52e246f673e763da2b1eeec8deda872571602bb7b1" => :mavericks
+  end
+
+  # don't use depends_on :python because then bottles install Homebrew's python
+  option "without-python", "Build without python 2 support"
+  depends_on :python => :recommended if MacOS.version <= :snow_leopard
+  depends_on :python3 => :optional
+
+  option "without-docs", "Skip building documentation"
+
+  depends_on "cmake" => :build
+  depends_on "sphinx-doc" => :build if build.with? "docs"
+  depends_on "qt"
+
+  if build.with? "python3"
+    depends_on "shiboken" => "with-python3"
+  else
+    depends_on "shiboken"
   end
 
   def install
-    # The build will be unable to find Qt headers buried inside frameworks
-    # unless the folder containing those frameworks is added to the compiler
-    # search path.
-    qt = Formula.factory 'qt'
-    ENV.append_to_cflags "-F#{qt.prefix}/Frameworks"
+    rm buildpath/"doc/CMakeLists.txt" if build.without? "docs"
 
-    # Also need `ALTERNATIVE_QT_INCLUDE_DIR` to prevent "missing file" errors.
     # Add out of tree build because one of its deps, shiboken, itself needs an
     # out of tree build in shiboken.rb.
-    args = std_cmake_args + %W[
-      -DALTERNATIVE_QT_INCLUDE_DIR=#{qt.prefix}/Frameworks
-      -DSITE_PACKAGE=lib/#{which_python}/site-packages
-      -DBUILD_TESTS=NO
-      ..
-    ]
-    mkdir 'macbuild' do
-      system 'cmake', *args
-      system 'make'
-      system 'make install'
+    Language::Python.each_python(build) do |python, version|
+      abi = `#{python} -c 'import sysconfig as sc; print(sc.get_config_var("SOABI"))'`.strip
+      python_suffix = python == "python" ? "-python2.7" : ".#{abi}"
+      mkdir "macbuild#{version}" do
+        qt = Formula["qt"].opt_prefix
+        args = std_cmake_args + %W[
+          -DSITE_PACKAGE=#{lib}/python#{version}/site-packages
+          -DALTERNATIVE_QT_INCLUDE_DIR=#{qt}/include
+          -DQT_SRC_DIR=#{qt}/src
+          -DPYTHON_SUFFIX=#{python_suffix}
+        ]
+        args << ".."
+        system "cmake", *args
+        system "make"
+        system "make", "install"
+      end
     end
+
+    inreplace include/"PySide/pyside_global.h", Formula["qt"].prefix, Formula["qt"].opt_prefix
   end
 
-  def caveats
-    <<-EOS
-PySide Python modules have been linked to:
-    #{HOMEBREW_PREFIX}/lib/#{which_python}/site-packages
-
-Make sure this folder is on your PYTHONPATH. For PySide development tools,
-install the `pyside-tools` formula.
-    EOS
+  test do
+    Language::Python.each_python(build) do |python, _version|
+      system python, "-c", "from PySide import QtCore"
+    end
   end
 end

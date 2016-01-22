@@ -1,47 +1,48 @@
-require 'formula'
-
 class Quassel < Formula
-  homepage 'http://www.quassel-irc.org/'
-  url 'http://www.quassel-irc.org/pub/quassel-0.8.0.tar.bz2'
-  sha1 'b74967fa9f19b5d7c708279075cc0ef3a3dbbe8b'
+  desc "Distributed IRC client (Qt-based)"
+  homepage "http://www.quassel-irc.org/"
+  head "https://github.com/quassel/quassel.git"
 
-  head 'git://git.quassel-irc.org/quassel.git'
+  stable do
+    url "http://www.quassel-irc.org/pub/quassel-0.12.2.tar.bz2"
+    sha256 "6bd6f79ecb88fb857bea7e89c767a3bd0f413ff01bae9298dd2e563478947897"
 
-  depends_on 'cmake' => :build
-  depends_on 'qt'
-
-  def patches
-    DATA
+    # Fix Qt 5.5 build failure.
+    patch do
+      url "https://github.com/quassel/quassel/commit/078477395aaec1edee90922037ebc8a36b072d90.patch"
+      sha256 "85adfbe4613688d0f282deb5250fb39f7534d9e6ac7450cf035cca7bbcb25cda"
+    end
   end
+
+  bottle do
+    cellar :any
+    sha256 "f7774d699f282e21bbeb5173ac12882d27b987e91c2852ade0956863bc66bc57" => :el_capitan
+    sha256 "3363d8178acaab991193707112d25f6550b448d8035b46bb84c966be33a63ac2" => :yosemite
+    sha256 "9d62b09f40bd0e3ec28c1d473c35cc07fff37127f126105cfdebcdd5e4c7fca4" => :mavericks
+  end
+
+  depends_on "cmake" => :build
+  depends_on "pkg-config" => :build
+
+  # Official binary packages upstream now built against qt5 by default. But source
+  # packages default to qt4 *for now*, and Homebrew prioritises qt5 in PATH due to keg_only.
+  depends_on "qt5" => :optional
+  depends_on "qt" => :recommended
+
+  needs :cxx11
 
   def install
-    system "cmake", ".", *std_cmake_args
-    system "make install"
+    ENV.cxx11
+
+    args = std_cmake_args
+    args << "."
+    args << "-DUSE_QT5=ON" if build.with? "qt5"
+
+    system "cmake", *args
+    system "make", "install"
+  end
+
+  test do
+    assert_match /Quassel IRC/, shell_output("#{bin}/quasselcore -v", 1)
   end
 end
-
-__END__
---- a/src/qtui/chatscene.cpp	2012-03-20 13:39:20.000000000 -0700
-+++ b/src/qtui/chatscene.cpp	2012-06-20 10:06:44.000000000 -0700
-@@ -33,7 +33,7 @@
- #endif
- 
- #ifdef HAVE_WEBKIT
--#  include <QWebView>
-+#  include <QtWebKit/QWebView>
- #endif
- 
- #include "chatitem.h"
---- a/src/qtui/webpreviewitem.cpp	2012-03-20 13:39:20.000000000 -0700
-+++ b/src/qtui/webpreviewitem.cpp	2012-06-20 10:08:51.000000000 -0700
-@@ -24,8 +24,8 @@
- 
- #include <QGraphicsProxyWidget>
- #include <QPainter>
--#include <QWebView>
--#include <QWebSettings>
-+#include <QtWebKit/QWebView>
-+#include <QtWebKit/QWebSettings>
- 
- WebPreviewItem::WebPreviewItem(const QUrl &url)
-   : QGraphicsItem(0), // needs to be a top level item as we otherwise cannot guarantee that it's on top of other chatlines

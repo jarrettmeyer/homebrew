@@ -1,13 +1,13 @@
-require 'formula'
-
 class Hornetq < Formula
-  homepage 'http://www.jboss.org/hornetq'
-  url 'http://downloads.jboss.org/hornetq/hornetq-2.2.14.Final.tar.gz'
-  sha1 'e02656a93ef9e3cb02cbb8b6e7953b591b59fa71'
+  desc "Multi-protocol, embeddable, clustered, asynchronous messaging system"
+  homepage "https://hornetq.jboss.org/"
+  url "https://downloads.jboss.org/hornetq/hornetq-2.4.0.Final-bin.tar.gz"
+  version "2.4.0"
+  sha256 "a774083f6b56b368624eafd85002f7b9d15472690daf6dc6ca04c7561e66b013"
 
-  version '2.2.14'
+  bottle :unneeded
 
-  def wrapper_script target
+  def wrapper_script(target)
     <<-EOS.undent
       #!/bin/bash
       cd #{libexec}/bin/
@@ -16,9 +16,9 @@ class Hornetq < Formula
   end
 
   def install
-    libexec.install Dir['*']
-    (bin+'hornet-start').write wrapper_script('run.sh')
-    (bin+'hornet-stop').write wrapper_script('stop.sh')
+    libexec.install Dir["*"]
+    (bin+"hornet-start").write wrapper_script("run.sh")
+    (bin+"hornet-stop").write wrapper_script("stop.sh")
   end
 
   def caveats; <<-EOF.undent

@@ -1,81 +1,57 @@
-require 'formula'
-
 class Libplist < Formula
-  homepage 'http://cgit.sukimashita.com/libplist.git/'
-  url 'http://cgit.sukimashita.com/libplist.git/snapshot/libplist-1.10.tar.bz2'
-  sha1 'a642bb37eaa4bec428d0b2a4fa8399d80ee73a18'
+  desc "Library for Apple Binary- and XML-Property Lists"
+  homepage "http://www.libimobiledevice.org"
+  url "http://www.libimobiledevice.org/downloads/libplist-1.12.tar.bz2"
+  sha256 "0effdedcb3de128c4930d8c03a3854c74c426c16728b8ab5f0a5b6bdc0b644be"
 
-  head 'http://git.sukimashita.com/libplist.git'
+  bottle do
+    cellar :any
+    sha256 "44d4da500ed4448656ce335d43ff89c8df8bfc7fd7d78515e9e111e32673e645" => :el_capitan
+    sha256 "c6f8dbc8fc0431d41e73c8f7da6a1292ec7d26358208540d99f775ad9af900ca" => :yosemite
+    sha256 "5bfb26555e67a5a8b144ea187e32ba4b287901e4b7358e9b617aad2ddc82f9eb" => :mavericks
+    sha256 "251e34405ba2111cb2f30e0857b81072b92563ebd9efa77e240214daf106560f" => :mountain_lion
+  end
 
-  option 'with-python', 'Enable Cython Python bindings'
+  head do
+    url "http://git.sukimashita.com/libplist.git"
 
-  depends_on 'cmake' => :build
+    depends_on "automake" => :build
+    depends_on "autoconf" => :build
+    depends_on "libtool" => :build
+  end
 
-  if build.include? 'with-python'
-    depends_on 'Cython' => :python
-    # Needed to find the Cython executable
-    env :userpaths
+  option "with-python", "Enable Cython Python bindings"
+
+  depends_on "pkg-config" => :build
+  depends_on "libxml2"
+  depends_on :python => :optional
+
+  resource "cython" do
+    url "http://cython.org/release/Cython-0.21.tar.gz"
+    sha256 "0cd5787fb3f1eaf8326b21bdfcb90aabd3eca7c214c5b7b503fbb82da97bbaa0"
   end
 
   def install
-    ENV.deparallelize # make fails on an 8-core Mac Pro
+    ENV.deparallelize
+    args = %W[
+      --disable-dependency-tracking
+      --disable-silent-rules
+      --prefix=#{prefix}
+    ]
 
-    args = std_cmake_args
-
-    # Disable Swig Python bindings
-    args << "-DENABLE_SWIG='OFF'"
-
-    if build.include? 'with-python'
-      ## Taken from opencv.rb
-      #
-      # The CMake `FindPythonLibs` Module is dumber than a bag of hammers when
-      # more than one python installation is available---for example, it clings
-      # to the Header folder of the system Python Framework like a drowning
-      # sailor.
-      #
-      # This code was cribbed from the VTK formula and uses the output to
-      # `python-config` to do the job FindPythonLibs should be doing in the first
-      # place.
-      python_prefix = `python-config --prefix`.strip
-      # Python is actually a library. The libpythonX.Y.dylib points to this lib, too.
-      if File.exist? "#{python_prefix}/Python"
-      # Python was compiled with --framework:
-        args << "-DPYTHON_LIBRARY='#{python_prefix}/Python'"
-        if !MacOS::CLT.installed? and python_prefix.start_with? '/System/Library'
-          # For Xcode-only systems, the headers of system's python are inside of Xcode
-          args << "-DPYTHON_INCLUDE_DIR='#{MacOS.sdk_path}/System/Library/Frameworks/Python.framework/Versions/2.7/Headers'"
-        else
-          args << "-DPYTHON_INCLUDE_DIR='#{python_prefix}/Headers'"
-        end
-      else
-        python_lib = "#{python_prefix}/lib/lib#{which_python}"
-        if File.exists? "#{python_lib}.a"
-          args << "-DPYTHON_LIBRARY='#{python_lib}.a'"
-        else
-          args << "-DPYTHON_LIBRARY='#{python_lib}.dylib'"
-        end
-        args << "-DPYTHON_INCLUDE_DIR='#{python_prefix}/include/#{which_python}'"
+    if build.with? "python"
+      resource("cython").stage do
+        ENV.prepend_create_path "PYTHONPATH", buildpath+"lib/python2.7/site-packages"
+        system "python", "setup.py", "build", "install", "--prefix=#{buildpath}",
+                 "--single-version-externally-managed", "--record=installed.txt"
       end
+      ENV.prepend_path "PATH", "#{buildpath}/bin"
     else
-      # Also disable Cython Python bindings if we're not building with '--python'
-      args << "-DENABLE_CYTHON='OFF'"
+      args << "--without-cython"
     end
 
-    system "cmake", ".", "-DCMAKE_INSTALL_NAME_DIR=#{lib}", *args
-    system "make install"
-  end
-
-  def caveats
-    if build.include? 'with-python'
-      <<-EOS.undent
-        To use the Python bindings with non-homebrew Python, you need to amend your
-        PYTHONPATH like so:
-          export PYTHONPATH=#{HOMEBREW_PREFIX}/lib/#{which_python}/site-packages:$PYTHONPATH
-      EOS
-    end
-  end
-
-  def which_python
-    "python" + `python -c 'import sys;print(sys.version[:3])'`.strip
+    system "./autogen.sh" if build.head?
+    system "./configure", *args
+    system "make", "install"
   end
 end

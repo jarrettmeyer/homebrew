@@ -1,16 +1,18 @@
-require 'formula'
-require 'tab'
-require 'keg'
-require 'caveats'
-require 'blacklist'
+require "blacklist"
+require "caveats"
+require "options"
+require "formula"
+require "keg"
+require "tab"
+require "utils/json"
 
-module Homebrew extend self
+module Homebrew
   def info
     # eventually we'll solidify an API, but we'll keep old versions
     # awhile around for compatibility
     if ARGV.json == "v1"
       print_json
-    elsif ARGV.flag? '--github'
+    elsif ARGV.flag? "--github"
       exec_browser(*ARGV.formulae.map { |f| github_info(f) })
     else
       print_info
@@ -19,96 +21,96 @@ module Homebrew extend self
 
   def print_info
     if ARGV.named.empty?
-      if ARGV.include? "--all"
-        Formula.each do |f|
-          info_formula f
-          puts '---'
-        end
-      else
-        puts "#{HOMEBREW_CELLAR.children.length} kegs, #{HOMEBREW_CELLAR.abv}"
+      if HOMEBREW_CELLAR.exist?
+        count = Formula.racks.length
+        puts "#{count} keg#{plural(count)}, #{HOMEBREW_CELLAR.abv}"
       end
-    elsif valid_url ARGV[0]
-      info_formula Formula.factory(ARGV.shift)
     else
-      ARGV.named.each do |f|
+      ARGV.named.each_with_index do |f, i|
+        puts unless i == 0
         begin
-          info_formula Formula.factory(f)
+          if f.include?("/") || File.exist?(f)
+            info_formula Formulary.factory(f)
+          else
+            info_formula Formulary.find_with_priority(f)
+          end
         rescue FormulaUnavailableError
           # No formula with this name, try a blacklist lookup
-          blacklist = blacklisted?(f)
-          puts blacklist if blacklist
+          if (blacklist = blacklisted?(f))
+            puts blacklist
+          else
+            raise
+          end
         end
       end
     end
   end
 
   def print_json
-    require 'vendor/multi_json'
-
-    formulae = ARGV.include?("--all") ? Formula : ARGV.formulae
-    json = formulae.map {|f| f.to_hash}
-    if json.size == 1
-      puts MultiJson.encode json.pop
+    ff = if ARGV.include? "--all"
+      Formula
+    elsif ARGV.include? "--installed"
+      Formula.installed
     else
-      puts MultiJson.encode json
+      ARGV.formulae
     end
+    json = ff.map(&:to_hash)
+    puts Utils::JSON.dump(json)
   end
 
-  def github_fork
-    if which 'git' and (HOMEBREW_REPOSITORY/".git").directory?
-      if `git remote -v` =~ %r{origin\s+(https?://|git(?:@|://))github.com[:/](.+)/homebrew}
-        $2
-      end
-    end
-  end
-
-  def github_info f
-    path = f.path.realpath
-
-    if path.to_s =~ %r{#{HOMEBREW_REPOSITORY}/Library/Taps/(\w+)-(\w+)/(.*)}
-      user = $1
-      repo = "homebrew-#$2"
-      path = $3
+  def github_remote_path(remote, path)
+    if remote =~ %r{^(?:https?://|git(?:@|://))github\.com[:/](.+)/(.+?)(?:\.git)?$}
+      "https://github.com/#{$1}/#{$2}/blob/master/#{path}"
     else
-      path.parent.cd do
-        user = github_fork
-      end
-      repo = "homebrew"
-      path = "Library/Formula/#{path.basename}"
+      "#{remote}/#{path}"
     end
-
-    "https://github.com/#{user}/#{repo}/commits/master/#{path}"
   end
 
-  def info_formula f
+  def github_info(f)
+    if f.tap
+      if remote = f.tap.remote
+        path = f.path.relative_path_from(f.tap.path)
+        github_remote_path(remote, path)
+      else
+        f.path
+      end
+    else
+      f.path
+    end
+  end
+
+  def info_formula(f)
     specs = []
-    stable = "stable #{f.stable.version}" if f.stable
-    stable += " (bottled)" if f.bottle
-    specs << stable if stable
-    specs << "devel #{f.devel.version}" if f.devel
+
+    if stable = f.stable
+      s = "stable #{stable.version}"
+      s += " (bottled)" if stable.bottled?
+      specs << s
+    end
+
+    if devel = f.devel
+      s = "devel #{devel.version}"
+      s += " (bottled)" if devel.bottled?
+      specs << s
+    end
+
     specs << "HEAD" if f.head
 
-    puts "#{f.name}: #{specs*', '}#{' (pinned)' if f.pinned?}"
+    attrs = []
+    attrs << "pinned at #{f.pinned_version}" if f.pinned?
+    attrs << "keg-only" if f.keg_only?
 
-    puts f.homepage
+    puts "#{f.full_name}: #{specs * ", "}#{" [#{attrs * ", "}]" if attrs.any?}"
+    puts f.desc if f.desc
+    puts "#{Tty.em}#{f.homepage}#{Tty.reset}" if f.homepage
 
-    if f.keg_only?
-      puts
-      puts "This formula is keg-only."
-      puts f.keg_only_reason
-      puts
-    end
+    conflicts = f.conflicts.map(&:name).sort!
+    puts "Conflicts with: #{conflicts*", "}" unless conflicts.empty?
 
-    puts "Depends on: #{f.deps*', '}" unless f.deps.empty?
-    conflicts = f.conflicts.map { |c| c.formula }.sort
-    puts "Conflicts with: #{conflicts*', '}" unless conflicts.empty?
-
-    if f.rack.directory?
-      kegs = f.rack.children
-      kegs.reject! {|keg| keg.basename.to_s == '.DS_Store' }
-      kegs = kegs.map {|keg| Keg.new(keg) }.sort_by {|keg| keg.version }
+    kegs = f.installed_kegs.sort_by(&:version)
+    if kegs.any?
       kegs.each do |keg|
-        puts "#{keg} (#{keg.abv})#{' *' if keg.linked?}"
+        puts "#{keg} (#{keg.abv})#{" *" if keg.linked?}"
         tab = Tab.for_keg(keg).to_s
         puts "  #{tab}" unless tab.empty?
       end
@@ -116,33 +118,29 @@ module Homebrew extend self
       puts "Not installed"
     end
 
-    history = github_info(f)
-    puts history if history
+    puts "From: #{Tty.em}#{github_info(f)}#{Tty.reset}"
 
-    unless f.build.empty?
-      require 'cmd/options'
+    unless f.deps.empty?
+      ohai "Dependencies"
+      %w[build required recommended optional].map do |type|
+        deps = f.deps.send(type).uniq
+        puts "#{type.capitalize}: #{decorate_dependencies deps}" unless deps.empty?
+      end
+    end
+
+    unless f.options.empty?
       ohai "Options"
       Homebrew.dump_options_for_formula f
     end
 
     c = Caveats.new(f)
-    ohai 'Caveats', c.caveats unless c.empty?
+    ohai "Caveats", c.caveats unless c.empty?
+  end
 
-  rescue FormulaUnavailableError
-    # check for DIY installation
-    d = HOMEBREW_PREFIX+name
-    if d.directory?
-      ohai "DIY Installation"
-      d.children.each{ |keg| puts "#{keg} (#{keg.abv})" }
-    else
-      raise "No such formula or keg"
+  def decorate_dependencies(dependencies)
+    deps_status = dependencies.collect do |dep|
+      dep.installed? ? pretty_installed(dep) : pretty_uninstalled(dep)
     end
+    deps_status * ", "
   end
-
-  private
-
-  def valid_url u
-    u[0..6] == 'http://' or u[0..7] == 'https://' or u[0..5] == 'ftp://'
-  end
-
 end

@@ -1,78 +1,87 @@
-require 'formula'
-
 class Thrift < Formula
-  homepage 'http://thrift.apache.org'
-  url 'http://www.apache.org/dyn/closer.cgi?path=thrift/0.9.0/thrift-0.9.0.tar.gz'
-  sha1 'fefcf4d729bf80da419407dfa028740aa95fa2e3'
+  desc "Framework for scalable cross-language services development"
+  homepage "https://thrift.apache.org/"
 
-  head 'http://svn.apache.org/repos/asf/thrift/trunk'
+  stable do
+    url "https://www.apache.org/dyn/closer.cgi?path=/thrift/0.9.3/thrift-0.9.3.tar.gz"
+    sha256 "b0740a070ac09adde04d43e852ce4c320564a292f26521c46b78e0641564969e"
+
+    # Apply any necessary patches (none currently required)
+    [
+      # Example patch:
+      #
+      # Apply THRIFT-2201 fix from master to 0.9.1 branch (required for clang to compile with C++11 support)
+      # %w{836d95f9f00be73c6936d407977796181d1a506c f8e14cbae1810ade4eab49d91e351459b055c81dba144c1ca3c5d6f4fe440925},
+    ].each do |name, sha|
+      patch do
+        url "https://git-wip-us.apache.org/repos/asf?p=thrift.git;a=commitdiff_plain;h=#{name}"
+        sha256 sha
+      end
+    end
+  end
+
+  bottle do
+    cellar :any
+    sha256 "171011fa42efb2fcafb1bae1e2d173e585eda199f145a62a825359c7a622b24b" => :el_capitan
+    sha256 "655bb0a05eb51ff465f8f378a7d3ea2438095e2d4c2a70da45965731b5de9cfb" => :yosemite
+    sha256 "092ff2a100f41871d3527c450403cfc2cf1cc0527ce2fdb4089f93915365713d" => :mavericks
+  end
+
+  head do
+    url "https://git-wip-us.apache.org/repos/asf/thrift.git"
+
+    depends_on "autoconf" => :build
+    depends_on "automake" => :build
+    depends_on "libtool" => :build
+    depends_on "pkg-config" => :build
+  end
 
   option "with-haskell", "Install Haskell binding"
   option "with-erlang", "Install Erlang binding"
   option "with-java", "Install Java binding"
   option "with-perl", "Install Perl binding"
-  option "with-php", "Install Php binding"
+  option "with-php", "Install PHP binding"
+  option "with-libevent", "Install nonblocking server libraries"
 
-  depends_on 'boost'
-
-  # Includes are fixed in the upstream. Please remove this patch in the next version > 0.9.0
-  def patches
-    DATA
-  end
+  depends_on "bison" => :build
+  depends_on "boost"
+  depends_on "openssl"
+  depends_on "libevent" => :optional
+  depends_on :python => :optional
 
   def install
-    # No reason for this step is known. On Lion at least the pkg.m4 doesn't
-    # even exist. Turns out that it isn't needed on Lion either. Possibly it
-    # isn't needed anymore at all but I can't test that.
-    cp "#{MacOS::X11.share}/aclocal/pkg.m4", "aclocal" if MacOS.version < :lion
+    system "./bootstrap.sh" unless build.stable?
 
-    system "./bootstrap.sh" if build.head?
+    exclusions = ["--without-ruby", "--disable-tests", "--without-php_extension"]
 
-    exclusions = ["--without-python", "--without-ruby"]
+    exclusions << "--without-python" if build.without? "python"
+    exclusions << "--without-haskell" if build.without? "haskell"
+    exclusions << "--without-java" if build.without? "java"
+    exclusions << "--without-perl" if build.without? "perl"
+    exclusions << "--without-php" if build.without? "php"
+    exclusions << "--without-erlang" if build.without? "erlang"
 
-    exclusions << "--without-haskell" unless build.include? "with-haskell"
-    exclusions << "--without-java" unless build.include? "with-java"
-    exclusions << "--without-perl" unless build.include? "with-perl"
-    exclusions << "--without-php" unless build.include? "with-php"
-    exclusions << "--without-erlang" unless build.include? "with-erlang"
+    ENV.cxx11 if MacOS.version >= :mavericks && ENV.compiler == :clang
 
-    # Language bindings try to install outside of Homebrew's prefix, so
-    # omit them here. For ruby you can install the gem, and for Python
-    # you can use pip or easy_install.
+    # Don't install extensions to /usr:
+    ENV["PY_PREFIX"] = prefix
+    ENV["PHP_PREFIX"] = prefix
+
     system "./configure", "--disable-debug",
                           "--prefix=#{prefix}",
                           "--libdir=#{lib}",
                           *exclusions
     ENV.j1
     system "make"
-    system "make install"
+    system "make", "install"
   end
 
   def caveats; <<-EOS.undent
-    To install Python bindings:
-      pip install thrift
-
-    To install Ruby bindings:
+    To install Ruby binding:
       gem install thrift
 
-    To install PHP bindings:
-      export PHP_PREFIX=/path/to/homebrew/thrift/0.9.0/php
-      export PHP_CONFIG_PREFIX=/path/to/homebrew/thrift/0.9.0/php_extensions
-      brew install thrift --with-php
-    EOS
+    To install PHP extension for e.g. PHP 5.5:
+      brew install homebrew/php/php55-thrift
+  EOS
   end
 end
-__END__
-diff --git a/lib/cpp/src/thrift/transport/TSocket.h b/lib/cpp/src/thrift/transport/TSocket.h
-index ff5e541..65e6aea 100644
---- a/lib/cpp/src/thrift/transport/TSocket.h
-+++ b/lib/cpp/src/thrift/transport/TSocket.h
-@@ -21,6 +21,8 @@
- #define _THRIFT_TRANSPORT_TSOCKET_H_ 1
-
- #include <string>
-+#include <sys/socket.h>
-+#include <arpa/inet.h>
-
- #include "TTransport.h"
- #include "TVirtualTransport.h"

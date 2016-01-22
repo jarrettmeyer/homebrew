@@ -1,18 +1,15 @@
-require 'formula'
-
 class Id3v2 < Formula
-  homepage 'http://id3v2.sourceforge.net/'
-  url 'http://downloads.sourceforge.net/project/id3v2/id3v2/0.1.11/id3v2-0.1.11.tar.gz'
-  sha1 'ca825d851ca0c6a5783af107dc6baa7aa93f0bad'
+  desc "ID3v2 editing tool"
+  homepage "http://id3v2.sourceforge.net/"
+  url "https://downloads.sourceforge.net/project/id3v2/id3v2/0.1.12/id3v2-0.1.12.tar.gz"
+  sha256 "8105fad3189dbb0e4cb381862b4fa18744233c3bbe6def6f81ff64f5101722bf"
 
-  depends_on 'id3lib'
+  depends_on "id3lib"
 
   def install
-    inreplace 'Makefile' do |s|
-      s.gsub! 'c++', ENV.cxx
-      s.gsub! '/man/man1', '/share/man/man1'
-    end
-
+    # tarball includes a prebuilt Linux binary, which will get installed
+    # by `make install` if `make clean` isn't run first
+    system "make", "clean"
     bin.mkpath
     man1.mkpath
     system "make", "install", "PREFIX=#{prefix}"

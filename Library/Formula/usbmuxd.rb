@@ -1,30 +1,35 @@
-require 'formula'
-
 class Usbmuxd < Formula
-  homepage 'http://marcansoft.com/blog/iphonelinux/usbmuxd/'
-  url 'http://www.libimobiledevice.org/downloads/usbmuxd-1.0.8.tar.bz2'
-  sha1 '56bd90d5ff94c1d9c528f8b49deffea25b7384e8'
+  desc "USB multiplexor daemon for iPhone and iPod Touch devices"
+  homepage "http://www.libimobiledevice.org"
+  url "http://www.libimobiledevice.org/downloads/libusbmuxd-1.0.10.tar.bz2"
+  sha256 "1aa21391265d2284ac3ccb7cf278126d10d354878589905b35e8102104fec9f2"
 
-  head 'http://cgit.sukimashita.com/usbmuxd.git'
+  bottle do
+    cellar :any
+    revision 1
+    sha256 "187e9dd2acbe0e80a92d72a1e0a2f61b37ff04d1defe22a88e5e26af4ca29e97" => :el_capitan
+    sha256 "83ab2b17215f3acec1787023d6177e1893301badecf7383b7ed1fa6133b7919a" => :yosemite
+    sha256 "13f348d39eb5191bfb4940ee569b9e2d986632542ec7d876a6e8aebe72f0ebeb" => :mavericks
+    sha256 "3c3583976e0c06b67304a2432723e477df7b7c6861bb0fc4c7a82b3b1314212e" => :mountain_lion
+  end
 
-  depends_on 'cmake' => :build
-  depends_on 'pkg-config' => :build
+  head do
+    url "http://git.sukimashita.com/libusbmuxd.git"
 
-  depends_on 'libusb'
-  depends_on 'libplist'
+    depends_on "automake" => :build
+    depends_on "autoconf" => :build
+    depends_on "libtool" => :build
+  end
+
+  depends_on "pkg-config" => :build
+  depends_on "libusb"
+  depends_on "libplist"
 
   def install
-    libusb = Formula.factory 'libusb'
-    inreplace 'Modules/VersionTag.cmake', '"sh"', '"bash"'
-
-    # The CMake scripts responsible for locating libusb headers are broken. So,
-    # we explicitly point the build script at the proper directory.
-    mkdir 'build' do
-      system "cmake", "..",
-                      "-DLIB_SUFFIX=",
-                      "-DUSB_INCLUDE_DIR=#{libusb.include.children.first}",
-                      *std_cmake_args
-      system 'make install'
-    end
+    system "./autogen.sh" if build.head?
+    system "./configure", "--disable-dependency-tracking",
+                          "--disable-silent-rules",
+                          "--prefix=#{prefix}"
+    system "make", "install"
   end
 end

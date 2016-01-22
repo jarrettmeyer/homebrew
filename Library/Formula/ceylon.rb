@@ -1,30 +1,32 @@
-require 'formula'
-
 class Ceylon < Formula
-  homepage 'http://ceylon-lang.org/'
-  url 'http://ceylon-lang.org/download/dist/1_0_Milestone5'
-  version '1.0M5'
-  sha1 'c013ce50ce2505f0b85fc18c9bf2ce8f13fca0ae'
+  desc "Programming language for writing large programs in teams"
+  homepage "http://ceylon-lang.org/"
+  url "http://ceylon-lang.org/download/dist/1_2_0"
+  sha256 "2e3b50e3e80ea3a356d0d62a2cff5b59104c591aa06387e55cd34a10d52c2919"
+
+  bottle :unneeded
+
+  depends_on :java => "1.7+"
 
   def install
     rm_f Dir["bin/*.bat"]
 
-    doc.install Dir['doc/*']
-    libexec.install Dir['*']
+    man1.install Dir["doc/man/man1/*"]
+    doc.install Dir["doc/*"]
+    libexec.install Dir["*"]
 
-    # Symlink shell scripts but not args.sh
-    bin.install_symlink Dir["#{libexec}/bin/ceylon*"]
+    # Symlink shell scripts but not *.plugin
+    bin.install_symlink "#{libexec}/bin/ceylon"
+    bin.install_symlink "#{libexec}/bin/ceylon-sh-setup"
   end
 
-  def caveats
-    "Ceylon requires Java 7."
-  end
+  test do
+    ENV.java_cache
 
-  def test
     cd "#{libexec}/samples/helloworld" do
-      system "#{bin}/ceylon", "compile", "com.acme.helloworld"
-      system "#{bin}/ceylon", "doc", "--non-shared", "com.acme.helloworld"
-      system "#{bin}/ceylon", "run", "com.acme.helloworld/1.0.0", "John"
+      system "#{bin}/ceylon", "compile", "--out", "#{testpath}/modules", "--encoding", "UTF-8", "com.example.helloworld"
+      system "#{bin}/ceylon", "doc", "--out", "#{testpath}/modules", "--encoding", "UTF-8", "--non-shared", "com.example.helloworld"
+      system "#{bin}/ceylon", "run", "--rep", "#{testpath}/modules", "com.example.helloworld/1.2.0", "John"
     end
   end
 end

@@ -1,44 +1,29 @@
-require 'formula'
-
 class Leveldb < Formula
-  homepage 'https://code.google.com/p/leveldb/'
-  url 'https://leveldb.googlecode.com/files/leveldb-1.9.0.tar.gz'
-  sha1 '4d832277120912211998a2334fb975b995d51885'
+  desc "Key-value storage library with ordered mapping"
+  homepage "https://github.com/google/leveldb/"
+  url "https://github.com/google/leveldb/archive/v1.18.tar.gz"
+  sha256 "4aa1a7479bc567b95a59ac6fb79eba49f61884d6fd400f20b7af147d54c5cee5"
 
-  depends_on 'snappy' => :build
-
-  # tcmalloc causes segfault during linking on OSX
-  # https://code.google.com/p/leveldb/issues/detail?id=131
-  def patches
-    DATA
+  bottle do
+    cellar :any
+    sha256 "1d5edb51e88e13e185b0b43e01a2c1619fab8ccd25c6ae9ceb51cbc0be0f171d" => :el_capitan
+    sha256 "c1a5a200e385a6a3def5bf1b0daa6fc8deab3c4678defd90bd56e2a494dc888c" => :yosemite
+    sha256 "b5d3a94eb02f66c102af8ad1801326aebb0a15a97ebd3f1c070e947ed2c9a70f" => :mavericks
+    sha256 "0b1b668e35556b43c0c95a0482209650551ae065451f8a9163d2c053a3af65a9" => :mountain_lion
   end
+
+  depends_on "snappy"
 
   def install
     system "make"
-    system "make leveldbutil"
+    system "make", "leveldbutil"
+
     include.install "include/leveldb"
-    bin.install 'leveldbutil'
-    lib.install 'libleveldb.a'
-    lib.install 'libleveldb.dylib.1.9' => 'libleveldb.1.9.dylib'
-    lib.install_symlink lib/'libleveldb.1.9.dylib' => 'libleveldb.dylib'
-    lib.install_symlink lib/'libleveldb.1.9.dylib' => 'libleveldb.1.dylib'
+    bin.install "leveldbutil"
+    lib.install "libleveldb.a"
+    lib.install "libleveldb.dylib.1.18" => "libleveldb.1.18.dylib"
+    lib.install_symlink lib/"libleveldb.1.18.dylib" => "libleveldb.dylib"
+    lib.install_symlink lib/"libleveldb.1.18.dylib" => "libleveldb.1.dylib"
+    system "install_name_tool", "-id", "#{lib}/libleveldb.1.dylib", "#{lib}/libleveldb.1.18.dylib"
   end
 end
-
-__END__
---- a/build_detect_platform	2013-01-07 16:07:29.000000000 -0500
-+++ b/build_detect_platform	2013-02-16 14:28:06.000000000 -0500
-@@ -178,13 +178,6 @@
-         PLATFORM_LIBS="$PLATFORM_LIBS -lsnappy"
-     fi
-
--    # Test whether tcmalloc is available
--    $CXX $CXXFLAGS -x c++ - -o /dev/null -ltcmalloc 2>/dev/null  <<EOF
--      int main() {}
--EOF
--    if [ "$?" = 0 ]; then
--        PLATFORM_LIBS="$PLATFORM_LIBS -ltcmalloc"
--    fi
- fi
-
- PLATFORM_CCFLAGS="$PLATFORM_CCFLAGS $COMMON_FLAGS"

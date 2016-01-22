@@ -1,23 +1,33 @@
-require 'formula'
-
 class Ohcount < Formula
-  homepage 'http://sourceforge.net/apps/trac/ohcount/'
-  url 'http://downloads.sourceforge.net/project/ohcount/ohcount-3.0.0.tar.gz'
-  sha1 '5c1357b3094881ff9804fbf3002c9aaa16494cce'
+  desc "Source code line counter"
+  homepage "https://github.com/blackducksw/ohcount"
+  url "https://github.com/blackducksw/ohcount/archive/3.0.0.tar.gz"
+  sha256 "46ef92e1bbf9313de507a03decaf8279173584555fb580bb3d46d42c65aa4a6d"
 
-  depends_on 'ragel'
-  depends_on 'pcre'
-
-  def patches
-    DATA
+  head do
+    url "https://github.com/blackducksw/ohcount.git"
+    depends_on "libmagic"
   end
+
+  depends_on "ragel"
+  depends_on "pcre"
+
+  patch :DATA
 
   def install
     # find Homebrew's libpcre
-    ENV.append 'LDFLAGS', "-L#{HOMEBREW_PREFIX}/lib"
+    ENV.append "LDFLAGS", "-L#{HOMEBREW_PREFIX}/lib"
 
     system "./build", "ohcount"
-    bin.install 'bin/ohcount'
+    bin.install "bin/ohcount"
+  end
+
+  test do
+    path = testpath/"test.rb"
+    path.write "# comment\n puts\n puts\n"
+    stats = `#{bin}/ohcount -i #{path}`.split("\n")[-1]
+    assert_equal 0, $?.exitstatus
+    assert_equal ["ruby", "2", "1", "33.3%"], stats.split[0..3]
   end
 end
 

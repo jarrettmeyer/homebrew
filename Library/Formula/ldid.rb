@@ -1,33 +1,32 @@
-require 'formula'
-
 class Ldid < Formula
-  homepage 'http://www.saurik.com/id/8'
-  url 'http://svn.telesphoreo.org/trunk/data/ldid/ldid-1.0.610.tgz', :using => :curl
-  sha1 '0254b29f913f7fd10ec9a6d8891d36805980f649'
+  desc "Lets you manipulate the signature block in a Mach-O binary"
+  homepage "https://cydia.saurik.com/info/ldid/"
+  url "git://git.saurik.com/ldid.git",
+    :tag => "v1.1.2",
+    :revision => "604cc486bdefb246c984a21dbb30cdaf8b0a7f4d"
 
-  fails_with :clang do
-    build 421
-    cause "util/ldid.cpp:574:36: warning: format specifies type 'unsigned int' but the argument has type 'unsigned long' [-Wformat]"
+  head "git://git.saurik.com/ldid.git"
+
+  bottle do
+    cellar :any_skip_relocation
+    sha256 "4778b00a0baf3e32531315aaed1409ad5e03a14b70f662bd0bb0201ced449a29" => :el_capitan
+    sha256 "17d35f08f1d5c90a6c48a8d75369702bf792d731f7df5cc9e3bcc8f7af20f93d" => :yosemite
+    sha256 "bd0284ce2fee6ffb64e4cf6bb1bf8585a30f6c6dc074b325f31ba488664f529f" => :mavericks
   end
 
-  # Adds support for armv7 binaries
-  def patches; DATA; end
+  depends_on "openssl"
 
   def install
-    system "#{ENV.cxx} -I . -o util/ldid{,.cpp} -x c util/{lookup2,sha1}.c"
-    bin.install "util/ldid"
+    system "./make.sh"
+    bin.install "ldid"
+  end
+
+  test do
+    (testpath/"test.c").write <<-EOS.undent
+      int main(int argc, char **argv) { return 0; }
+    EOS
+
+    system ENV.cc, "test.c", "-o", "test"
+    system bin/"ldid", "-S", "test"
   end
 end
-
-__END__
-diff -ur ldid-1.0.610/util/ldid.cpp ldid-1.0.610-p/util/ldid.cpp
---- ldid-1.0.610/util/ldid.cpp	2009-05-20 14:33:45.000000000 +0800
-+++ ldid-1.0.610-gm/util/ldid.cpp	2011-10-14 16:58:56.000000000 +0800
-@@ -557,6 +557,7 @@
-                     case 12: switch (framework->cpusubtype) {
-                         case 0: arch = "arm"; break;
-                         case 6: arch = "armv6"; break;
-+                        case 9: arch = "armv7"; break;
-                         default: arch = NULL; break;
-                     } break;
- 

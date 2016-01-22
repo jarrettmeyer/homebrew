@@ -1,113 +1,105 @@
-require 'formula'
-
-class NeedsSnowLeopard < Requirement
-  satisfy MacOS.version >= :snow_leopard
-
-  def message; <<-EOS.undent
-    GHC requires OS X 10.6 or newer. The binary releases no longer work on
-    Leopard. See the following issue for details:
-        http://hackage.haskell.org/trac/ghc/ticket/6009
-    EOS
-  end
-end
-
-class Ghcbinary < Formula
-  if Hardware.is_64_bit? and not build.build_32_bit?
-    url 'http://www.haskell.org/ghc/dist/7.4.2/ghc-7.4.2-x86_64-apple-darwin.tar.bz2'
-    sha1 '7c655701672f4b223980c3a1068a59b9fbd08825'
-  else
-    url 'http://www.haskell.org/ghc/dist/7.4.2/ghc-7.4.2-i386-apple-darwin.tar.bz2'
-    sha1 '60f749893332d7c22bb4905004a67510992d8ef6'
-  end
-  version '7.4.2'
-end
-
-class Ghctestsuite < Formula
-  url 'https://github.com/ghc/testsuite/tarball/ghc-7.4.2-release'
-  sha1 '6b1f161a78a70638aacc931abfdef7dd50c7f923'
-end
-
 class Ghc < Formula
-  homepage 'http://haskell.org/ghc/'
-  url 'http://www.haskell.org/ghc/dist/7.4.2/ghc-7.4.2-src.tar.bz2'
-  sha1 '73b3b39dc164069bc80b69f7f2963ca1814ddf3d'
-
-  env :std
-
-  depends_on NeedsSnowLeopard
-
-  option '32-bit'
-  option 'tests', 'Verify the build using the testsuite in Fast Mode, 5 min'
+  desc "Glorious Glasgow Haskell Compilation System"
+  homepage "https://haskell.org/ghc/"
+  url "https://downloads.haskell.org/~ghc/7.10.3/ghc-7.10.3b-src.tar.bz2"
+  sha256 "b0bb177b8095de6074e5a3538e55fd1fc187dae6eb6ae36b05582c55f7d2db6f"
 
   bottle do
-    revision 1
-    sha1 '45b4f126123e71613564084851a8470fa4b06e6b' => :mountain_lion
-    sha1 'a93d9aab9e3abfe586f9091f14057c6d90f6fdc0' => :lion
-    sha1 '7d284bd3f3263be11229ac45f340fbf742ebbea6' => :snow_leopard
+    sha256 "72c6c729ea385aaebfa22b55fe31b85f46e423a510c83d2f76c8f57336f9bf2c" => :el_capitan
+    sha256 "3914b0875845c0e419c440c1b5833631ea709e6e8d5d9bf546422852c4c96ea8" => :yosemite
+    sha256 "3ca8542ed077871a9da2e7af1a2362eb6ddc52501e6625fa5b06e9fda288e980" => :mavericks
   end
 
-  fails_with :clang do
-    cause <<-EOS.undent
-      Building with Clang configures GHC to use Clang as its preprocessor,
-      which causes subsequent GHC-based builds to fail.
+  option "with-test", "Verify the build using the testsuite"
+  deprecated_option "tests" => "with-test"
+  deprecated_option "with-tests" => "with-test"
+
+  resource "gmp" do
+    url "http://ftpmirror.gnu.org/gmp/gmp-6.1.0.tar.bz2"
+    mirror "https://gmplib.org/download/gmp/gmp-6.1.0.tar.bz2"
+    mirror "https://ftp.gnu.org/gnu/gmp/gmp-6.1.0.tar.bz2"
+    sha256 "498449a994efeba527885c10405993427995d3f86b8768d8cdf8d9dd7c6b73e8"
+  end
+
+  if MacOS.version <= :lion
+    fails_with :clang do
+      cause <<-EOS.undent
+        Fails to bootstrap ghc-cabal. Error is:
+          libraries/Cabal/Cabal/Distribution/Compat/Binary/Class.hs:398:14:
+              The last statement in a 'do' block must be an expression
+                n <- get :: Get Int getMany n
       EOS
+    end
   end
 
-  def patches
-    # Explained: http://hackage.haskell.org/trac/ghc/ticket/7040
-    # Discussed: https://github.com/mxcl/homebrew/issues/13519
-    # Remove: version > 7.4.2
-    'http://hackage.haskell.org/trac/ghc/raw-attachment/ticket/7040/ghc7040.patch'
+  resource "binary" do
+    if MacOS.version <= :lion
+      url "https://downloads.haskell.org/~ghc/7.6.3/ghc-7.6.3-x86_64-apple-darwin.tar.bz2"
+      sha256 "f7a35bea69b6cae798c5f603471a53b43c4cc5feeeeb71733815db6e0a280945"
+    else
+      url "https://downloads.haskell.org/~ghc/7.10.3/ghc-7.10.3-x86_64-apple-darwin.tar.xz"
+      sha256 "852781d43d41cd55d02f818fe798bb4d1f7e52f488408167f413f7948cf1e7df"
+    end
+  end
+
+  resource "testsuite" do
+    url "https://downloads.haskell.org/~ghc/7.10.3/ghc-7.10.3-testsuite.tar.xz"
+    sha256 "50c151695c8099901334a8478713ee3bb895a90132e2b75d1493961eb8ec643a"
   end
 
   def install
-    # Move the main tarball contents into a subdirectory
-    (buildpath+'Ghcsource').install Dir['*']
+    # Build a static gmp rather than in-tree gmp, otherwise it links to brew's.
+    gmp = libexec/"integer-gmp"
 
-    # Define where the subformula will temporarily install itself
-    subprefix = buildpath+'subfo'
+    # MPN_PATH: The lowest common denomenator asm paths that work on Darwin,
+    # corresponding to Yonah and Merom. Obviates --disable-assembly.
+    ENV["MPN_PATH"] = "x86_64/fastsse x86_64/core2 x86_64 generic" if build.bottle?
 
-    Ghcbinary.new.brew do
-      system "./configure", "--prefix=#{subprefix}"
-      # Temporary j1 to stop an intermittent race condition
-      system 'make', '-j1', 'install'
-      ENV.prepend 'PATH', subprefix/'bin', ':'
+    # GMP *does not* use PIC by default without shared libs  so --with-pic
+    # is mandatory or else you'll get "illegal text relocs" errors.
+    resource("gmp").stage do
+      system "./configure", "--prefix=#{gmp}", "--with-pic", "--disable-shared"
+      system "make"
+      system "make", "check"
+      ENV.deparallelize { system "make", "install" }
     end
 
-    cd 'Ghcsource' do
-      # Fix an assertion when linking ghc with llvm-gcc
-      # https://github.com/mxcl/homebrew/issues/13650
-      ENV['LD'] = 'ld'
+    args = ["--with-gmp-includes=#{gmp}/include",
+            "--with-gmp-libraries=#{gmp}/lib",
+            "--with-ld=ld", # Avoid hardcoding superenv's ld.
+            "--with-gcc=#{ENV.cc}"] # Always.
 
-      if Hardware.is_64_bit? and not build.build_32_bit?
-        arch = 'x86_64'
-      else
-        ENV.m32 # Need to force this to fix build error on internal libgmp.
-        arch = 'i386'
-      end
-
-      system "./configure", "--prefix=#{prefix}",
-                            "--build=#{arch}-apple-darwin"
-      system 'make'
-      if build.include? 'tests'
-        Ghctestsuite.new.brew do
-          (buildpath+'Ghcsource/config').install Dir['config/*']
-          (buildpath+'Ghcsource/driver').install Dir['driver/*']
-          (buildpath+'Ghcsource/mk').install Dir['mk/*']
-          (buildpath+'Ghcsource/tests').install Dir['tests/*']
-          (buildpath+'Ghcsource/timeout').install Dir['timeout/*']
-          cd (buildpath+'Ghcsource/tests') do
-            system 'make', 'CLEANUP=1', "THREADS=#{ENV.make_jobs}", 'fast'
-          end
-        end
-      end
-      ENV.j1 # Fixes an intermittent race condition
-      system 'make', 'install'
+    if ENV.compiler == :clang
+      args << "--with-clang=#{ENV.cc}"
+    elsif ENV.compiler == :llvm
+      args << "--with-gcc-4.2=#{ENV.cc}"
     end
+
+    resource("binary").stage do
+      binary = buildpath/"binary"
+
+      system "./configure", "--prefix=#{binary}", *args
+      ENV.deparallelize { system "make", "install" }
+
+      ENV.prepend_path "PATH", binary/"bin"
+    end
+
+    system "./configure", "--prefix=#{prefix}", *args
+    system "make"
+
+    if build.with? "test"
+      resource("testsuite").stage { buildpath.install Dir["*"] }
+      cd "testsuite" do
+        system "make", "clean"
+        system "make", "CLEANUP=1", "THREADS=#{ENV.make_jobs}", "fast"
+      end
+    end
+
+    ENV.deparallelize { system "make", "install" }
   end
 
-  def caveats; <<-EOS.undent
-    This brew is for GHC only; you might also be interested in haskell-platform.
-    EOS
+  test do
+    (testpath/"hello.hs").write('main = putStrLn "Hello Homebrew"')
+    system "#{bin}/runghc", testpath/"hello.hs"
   end
 end

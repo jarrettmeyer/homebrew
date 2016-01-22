@@ -1,22 +1,36 @@
-require 'formula'
-
 class Zookeeper < Formula
-  homepage 'http://zookeeper.apache.org/'
-  url 'http://www.apache.org/dyn/closer.cgi?path=zookeeper/zookeeper-3.4.5/zookeeper-3.4.5.tar.gz'
-  sha1 'fd921575e02478909557034ea922de871926efc7'
+  desc "Centralized server for distributed coordination of services"
+  homepage "https://zookeeper.apache.org/"
 
-  head 'http://svn.apache.org/repos/asf/zookeeper/trunk'
-
-  if build.head?
-    depends_on :automake
-    depends_on :libtool
+  stable do
+    url "https://www.apache.org/dyn/closer.cgi?path=zookeeper/zookeeper-3.4.7/zookeeper-3.4.7.tar.gz"
+    sha256 "2e043e04c4da82fbdb38a68e585f3317535b3842c726e0993312948afcc83870"
   end
 
-  option "c",      "Build C bindings."
-  option "perl",   "Build Perl bindings."
-  option "python", "Build Python bindings."
+  bottle do
+    cellar :any
+    sha256 "60e839601ed35505f5d6150337d549557da43080c09ab507c3b1d6d06ef61942" => :el_capitan
+    sha256 "db117595b1d68c2fad858775318b108ae61e6c84ea08dce2aab556cb57c573a2" => :yosemite
+    sha256 "63a718951817139bea6829215db795b8cd958a21f0ad7a7b306422b9f2a11082" => :mavericks
+  end
 
-  def shim_script target
+  head do
+    url "https://svn.apache.org/repos/asf/zookeeper/trunk"
+
+    depends_on "ant" => :build
+    depends_on "cppunit" => :build
+    depends_on "libtool" => :build
+    depends_on "autoconf" => :build
+    depends_on "automake" => :build
+  end
+
+  option "with-perl", "Build Perl bindings"
+
+  deprecated_option "perl" => "with-perl"
+
+  depends_on :python => :optional
+
+  def shim_script(target)
     <<-EOS.undent
       #!/usr/bin/env bash
       . "#{etc}/zookeeper/defaults"
@@ -45,84 +59,102 @@ class Zookeeper < Formula
   def install
     # Don't try to build extensions for PPC
     if Hardware.is_32_bit?
-      ENV['ARCHFLAGS'] = "-arch i386"
+      ENV["ARCHFLAGS"] = "-arch #{Hardware::CPU.arch_32_bit}"
     else
-      ENV['ARCHFLAGS'] = "-arch i386 -arch x86_64"
+      ENV["ARCHFLAGS"] = Hardware::CPU.universal_archs.as_arch_flags
     end
 
-    # Prep work for svn compile.
     if build.head?
       system "ant", "compile_jute"
-
-      cd "src/c" do
-        system "autoreconf", "-if"
-      end
+      system "autoreconf", "-fvi", "src/c"
     end
 
-    build_python = build.include? "python"
-    build_perl = build.include? "perl"
-    build_c = build_python || build_perl || build.include?("c")
-
-    # Build & install C libraries.
     cd "src/c" do
       system "./configure", "--disable-dependency-tracking",
                             "--prefix=#{prefix}",
                             "--without-cppunit"
-      system "make install"
-    end if build_c
+      system "make", "install"
+    end
 
-    # Install Python bindings
-    cd "src/contrib/zkpython" do
-      system "python", "src/python/setup.py", "build"
-      system "python", "src/python/setup.py", "install", "--prefix=#{prefix}"
-    end if build_python
+    if build.with? "python"
+      cd "src/contrib/zkpython" do
+        system "python", "src/python/setup.py", "build"
+        system "python", "src/python/setup.py", "install", "--prefix=#{prefix}"
+      end
+    end
 
-    # Install Perl bindings
-    cd "src/contrib/zkperl" do
-      system "perl", "Makefile.PL", "PREFIX=#{prefix}",
-                                    "--zookeeper-include=#{include}/c-client-src",
-                                    "--zookeeper-lib=#{lib}"
-      system "make install"
-    end if build_perl
+    if build.with? "perl"
+      cd "src/contrib/zkperl" do
+        system "perl", "Makefile.PL", "PREFIX=#{prefix}",
+                                      "--zookeeper-include=#{include}",
+                                      "--zookeeper-lib=#{lib}"
+        system "make", "install"
+      end
+    end
 
-    # Remove windows executables
     rm_f Dir["bin/*.cmd"]
 
-    # Install Java stuff
     if build.head?
       system "ant"
-      libexec.install %w(bin src/contrib src/java/lib)
-      libexec.install Dir['build/*.jar']
+      libexec.install Dir["bin", "src/contrib", "src/java/lib", "build/*.jar"]
     else
-      libexec.install %w(bin contrib lib)
-      libexec.install Dir['*.jar']
+      libexec.install Dir["bin", "contrib", "lib", "*.jar"]
     end
 
-    # Create necessary directories
     bin.mkpath
-    (etc+'zookeeper').mkpath
-    (var+'log/zookeeper').mkpath
-    (var+'run/zookeeper/data').mkpath
+    (etc/"zookeeper").mkpath
+    (var/"log/zookeeper").mkpath
+    (var/"run/zookeeper/data").mkpath
 
-    # Install shim scripts to bin
-    Dir["#{libexec}/bin/*.sh"].map { |p| Pathname.new p }.each { |path|
-      next if path == libexec+'bin/zkEnv.sh'
+    Pathname.glob("#{libexec}/bin/*.sh") do |path|
+      next if path == libexec+"bin/zkEnv.sh"
       script_name = path.basename
-      bin_name    = path.basename '.sh'
+      bin_name    = path.basename ".sh"
       (bin+bin_name).write shim_script(script_name)
-    }
+    end
 
-    # Install default config files
-    defaults = etc/'zookeeper/defaults'
+    defaults = etc/"zookeeper/defaults"
     defaults.write(default_zk_env) unless defaults.exist?
 
-    log4j_properties = etc/'zookeeper/log4j.properties'
+    log4j_properties = etc/"zookeeper/log4j.properties"
     log4j_properties.write(default_log4j_properties) unless log4j_properties.exist?
 
-    unless (etc/'zookeeper/zoo.cfg').exist?
-      inreplace 'conf/zoo_sample.cfg',
-                /^dataDir=.*/, "dataDir=#{var}/run/zookeeper/data"
-      (etc/'zookeeper').install 'conf/zoo_sample.cfg'
-    end
+    inreplace "conf/zoo_sample.cfg",
+              /^dataDir=.*/, "dataDir=#{var}/run/zookeeper/data"
+    cp "conf/zoo_sample.cfg", "conf/zoo.cfg"
+    (etc/"zookeeper").install ["conf/zoo.cfg", "conf/zoo_sample.cfg"]
+  end
+
+  plist_options :manual => "zkServer start"
+
+  def plist; <<-EOS.undent
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+      <dict>
+        <key>EnvironmentVariables</key>
+        <dict>
+           <key>SERVER_JVMFLAGS</key>
+           <string>-Dapple.awt.UIElement=true</string>
+        </dict>
+        <key>KeepAlive</key>
+        <dict>
+          <key>SuccessfulExit</key>
+          <false/>
+        </dict>
+        <key>Label</key>
+        <string>#{plist_name}</string>
+        <key>ProgramArguments</key>
+        <array>
+          <string>#{opt_bin}/zkServer</string>
+          <string>start-foreground</string>
+        </array>
+        <key>RunAtLoad</key>
+        <true/>
+        <key>WorkingDirectory</key>
+        <string>#{var}</string>
+      </dict>
+    </plist>
+    EOS
   end
 end

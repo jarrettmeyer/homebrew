@@ -1,93 +1,54 @@
-require 'formula'
-
 class Babl < Formula
-  homepage 'http://www.gegl.org/babl/'
-  url 'ftp://ftp.gtk.org/pub/babl/0.1/babl-0.1.10.tar.bz2'
-  sha1 'ee60089e8e9d9390e730d3ae5e41074549928b7a'
+  desc "Dynamic, any-to-any, pixel format translation library"
+  homepage "http://www.gegl.org/babl/"
+  url "https://download.gimp.org/pub/babl/0.1/babl-0.1.14.tar.bz2"
+  mirror "https://mirrors.kernel.org/debian/pool/main/b/babl/babl_0.1.14.orig.tar.bz2"
+  sha256 "e6dcb112c8f8f75471823fdcc5a6a65f753b4d0e96e377979ea01a5d6fad7d4f"
 
-  head 'git://git.gnome.org/babl'
+  bottle do
+    sha256 "7f5aacab0effd76ebb60e3057f5a620570e2cafa41017617f60b3d666be1e633" => :el_capitan
+    sha256 "dd3073278a5a7f3e584e37cfcd2fb5268a98b3230d16b125aec806a5968668f4" => :yosemite
+    sha256 "060bc343437aeff92ed1f411c4d4e98f5cb0577494eb8e55b2398f398071bf1a" => :mavericks
+  end
 
-  depends_on 'pkg-config' => :build
+  head do
+    # Use Github instead of GNOME's git. The latter is unreliable.
+    url "https://github.com/GNOME/babl.git"
+
+    depends_on "automake" => :build
+    depends_on "autoconf" => :build
+    depends_on "libtool" => :build
+  end
 
   option :universal
 
-  def patches
-    # There are two patches.
-    # The first one changes an include <values.h> (deleted on Mac OS X) to <limits.h>
-    # The second one fixes an error when compiling with clang. See:
-    # https://trac.macports.org/browser/trunk/dports/graphics/babl/files/clang.patch
-    { :p0 => DATA }
-  end
+  depends_on "pkg-config" => :build
 
   def install
     if build.universal?
       ENV.universal_binary
-      if ENV.compiler == :gcc
-        opoo 'Compilation may fail at babl-cpuaccel.c using gcc for a universal build'
-      end
+      opoo "Compilation may fail at babl-cpuaccel.c using gcc for a universal build" if ENV.compiler == :gcc
     end
 
+    system "./autogen.sh" if build.head?
     system "./configure", "--disable-dependency-tracking",
                           "--prefix=#{prefix}"
-    system "make install"
+    system "make", "install"
+  end
+
+  test do
+    (testpath/"test.c").write <<-EOS.undent
+      #include <babl/babl.h>
+      int main() {
+        babl_init();
+        const Babl *srgb = babl_format ("R'G'B' u8");
+        const Babl *lab  = babl_format ("CIE Lab float");
+        const Babl *rgb_to_lab_fish = babl_fish (srgb, lab);
+        babl_exit();
+        return 0;
+      }
+    EOS
+    system ENV.cc, "-I#{include}/babl-0.1", "-L#{lib}", "-lbabl-0.1", testpath/"test.c", "-o", "test"
+    system testpath/"test"
   end
 end
-
-__END__
-diff -cr babl.ori/babl-palette.c babl/babl-palette.c
-*** babl.ori/babl-palette.c	Sat Apr 14 01:31:40 2012
---- babl/babl-palette.c	Sat Apr 14 01:32:15 2012
-***************
-*** 19,25 ****
-  #include <stdlib.h>
-  #include <string.h>
-  #include <stdio.h>
-! #include <values.h>
-  #include <assert.h>
-  #include "config.h"
-  #include "babl-internal.h"
---- 19,25 ----
-  #include <stdlib.h>
-  #include <string.h>
-  #include <stdio.h>
-! #include <limits.h>
-  #include <assert.h>
-  #include "config.h"
-  #include "babl-internal.h"
-diff -cr extensions.ori/sse-fixups.c extensions/sse-fixups.c
-*** extensions.ori/sse-fixups.c	Sat Apr 14 01:31:40 2012
---- extensions/sse-fixups.c	Sat Apr 14 01:33:44 2012
-***************
-*** 21,27 ****
-  
-  #include "config.h"
-  
-! #if defined(__GNUC__) && (__GNUC__ >= 4) && defined(USE_SSE) && defined(USE_MMX)
-  
-  #include <stdint.h>
-  #include <stdlib.h>
---- 21,27 ----
-  
-  #include "config.h"
-  
-! #if !defined(__clang__) && defined(__GNUC__) && (__GNUC__ >= 4) && defined(USE_SSE) && defined(USE_MMX)
-  
-  #include <stdint.h>
-  #include <stdlib.h>
-***************
-*** 177,183 ****
-  int
-  init (void)
-  {
-! #if defined(__GNUC__) && (__GNUC__ >= 4) && defined(USE_SSE) && defined(USE_MMX)
-  
-    const Babl *rgbaF_linear = babl_format_new (
-      babl_model ("RGBA"),
---- 177,183 ----
-  int
-  init (void)
-  {
-! #if !defined(__clang__) && defined(__GNUC__) && (__GNUC__ >= 4) && defined(USE_SSE) && defined(USE_MMX)
-  
-    const Babl *rgbaF_linear = babl_format_new (
-      babl_model ("RGBA"),

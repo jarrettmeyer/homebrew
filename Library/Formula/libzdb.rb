@@ -1,28 +1,33 @@
-require 'formula'
-
 class Libzdb < Formula
-  homepage 'http://tildeslash.com/libzdb/'
-  url 'http://tildeslash.com/libzdb/dist/libzdb-2.11.1.tar.gz'
-  sha1 'c6fd44a779e7e0c112ebd7b30a1ee08f86feb41e'
+  desc "Database connection pool library"
+  homepage "http://tildeslash.com/libzdb/"
+  url "http://tildeslash.com/libzdb/dist/libzdb-3.1.tar.gz"
+  sha256 "0f01abb1b01d1a1f4ab9b55ad3ba445d203fc3b4757abdf53e1d85e2b7b42695"
+  revision 1
 
-  option 'without-sqlite',     "Compile without SQLite support"
-  option 'without-postgresql', "Compile without PostgreSQL support"
-  option 'without-mysql',      "Compile without MySQL support"
+  bottle do
+    cellar :any
+    sha256 "05236a5fa351eab9946a17e8c3219277a553287d40686e9dd3034acb02faed8a" => :el_capitan
+    sha256 "bcee0be3f6bb6eab4d8213f239db7f8d86b8548f99504be4b8a5b735c9f66bf4" => :yosemite
+    sha256 "989e41024a32bfab580881d647c8d7dbad9d9bb17a3fd9072e784ff98e2d0cef" => :mavericks
+  end
 
-  depends_on :postgresql unless build.include? 'without-postgresql'
-  depends_on :mysql unless build.include? 'without-mysql'
-  depends_on 'sqlite' unless build.include? 'without-sqlite'
+  depends_on "openssl"
+  depends_on :postgresql => :recommended
+  depends_on :mysql => :recommended
+  depends_on "sqlite" => :recommended
 
   def install
-    args = ["--disable-debug",
-            "--disable-dependency-tracking",
-            "--prefix=#{prefix}"]
+    args = %W[
+      --disable-dependency-tracking
+      --prefix=#{prefix}
+    ]
 
-    args << "--without-sqlite"     if build.include? 'without-sqlite'
-    args << "--without-mysql"      if build.include? 'without-mysql'
-    args << "--without-postgresql" if build.include? 'without-postgresql'
+    args << "--without-postgresql" if build.without? "postgresql"
+    args << "--without-mysql" if build.without? "mysql"
+    args << "--without-sqlite" if build.without? "sqlite"
 
     system "./configure", *args
-    system "make install"
+    system "make", "install"
   end
 end

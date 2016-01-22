@@ -1,21 +1,27 @@
-require 'formula'
-
 class Wemux < Formula
-  homepage 'https://github.com/zolrath/wemux'
-  url 'https://github.com/downloads/zolrath/wemux/wemux-3.1.0.tar.gz'
-  sha1 '707752b31dae746a28f0a33dfee21035820b1c15'
+  desc "Enhances tmux's to provide multiuser terminal multiplexing"
+  homepage "https://github.com/zolrath/wemux"
+  url "https://github.com/zolrath/wemux/archive/v3.2.0.tar.gz"
+  sha256 "8de6607df116b86e2efddfe3740fc5eef002674e551668e5dde23e21b469b06c"
 
-  head 'https://github.com/zolrath/wemux.git'
+  head "https://github.com/zolrath/wemux.git"
 
-  depends_on 'tmux'
+  bottle do
+    cellar :any
+    sha256 "582fd8b518b4103818772669694a0c6486cf346506d52c364cfbe01f4ab5b46b" => :mavericks
+    sha256 "f898bd7ec33a8f12691d7cfdb4cf976184e13d5d89241c7b1e0b194442d018e8" => :mountain_lion
+    sha256 "6842513f2fd6940e9905a6955394b8648935a6fd5fa4e94449d4a4711edf7bb8" => :lion
+  end
+
+  depends_on "tmux"
 
   def install
-    inreplace 'wemux', '/usr/local/etc', etc
-    bin.install 'wemux'
-    man1.install 'man/wemux.1'
+    inreplace "wemux", "/usr/local/etc", etc
+    bin.install "wemux"
+    man1.install "man/wemux.1"
 
-    inreplace 'wemux.conf.example', 'change_this', ENV['USER']
-    etc.install 'wemux.conf.example' => 'wemux.conf'
+    inreplace "wemux.conf.example", "change_this", ENV["USER"]
+    etc.install "wemux.conf.example" => "wemux.conf"
   end
 
   def caveats; <<-EOS.undent

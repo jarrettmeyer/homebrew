@@ -1,32 +1,32 @@
-require 'formula'
-
 class Tcpflow < Formula
-  homepage 'https://github.com/simsong/tcpflow'
-  url 'https://github.com/downloads/simsong/tcpflow/tcpflow-1.3.0.tar.gz'
-  sha1 'fccd0a451bf138e340fc3b55dfc07924c0a811d8'
-  head 'https://github.com/simsong/tcpflow.git'
+  desc "TCP flow recorder"
+  homepage "https://github.com/simsong/tcpflow"
+  url "http://digitalcorpora.org/downloads/tcpflow/tcpflow-1.4.5.tar.gz"
+  sha256 "f39fed437911b858c97937bc902f68f9a690753617abe825411a8483a7f70c72"
 
-  depends_on :libtool
-  depends_on :automake if build.head?
-
-  def copy_libtool_files!
-    if not MacOS::Xcode.provides_autotools?
-      s = Formula.factory('libtool').share
-      d = "#{s}/libtool/config"
-      cp ["#{d}/config.guess", "#{d}/config.sub"], "."
-    elsif MacOS.version == :leopard
-      cp Dir["#{MacOS::Xcode.prefix}/usr/share/libtool/config.*"], "."
-    else
-      cp Dir["#{MacOS::Xcode.prefix}/usr/share/libtool/config/config.*"], "."
-    end
+  bottle do
+    cellar :any
+    sha256 "ea92e38288a2fea16c85b9a937951b8ecc0c5ca619ccff050d36590866543356" => :el_capitan
+    sha256 "d5e07b6218d3160b27d12e154910286af4f3edbbbc70fe5879852849a046cfae" => :yosemite
+    sha256 "b0e5f0a0e6f6fc81be55627483028a578a679d1c342a7127aa3a983983acef1a" => :mavericks
   end
 
+  head do
+    url "https://github.com/simsong/tcpflow.git"
+    depends_on "autoconf" => :build
+    depends_on "automake" => :build
+    depends_on "libtool" => :build
+  end
+
+  depends_on "boost" => :build
+  depends_on "sqlite" if MacOS.version < :lion
+  depends_on "openssl"
+
   def install
-    copy_libtool_files!
     system "bash", "./bootstrap.sh" if build.head?
     system "./configure", "--disable-dependency-tracking",
                           "--prefix=#{prefix}",
                           "--mandir=#{man}"
-    system "make install"
+    system "make", "install"
   end
 end

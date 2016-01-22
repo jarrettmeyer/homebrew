@@ -1,20 +1,28 @@
-require 'formula'
-
 class Autossh < Formula
-  homepage 'http://www.harding.motd.ca/autossh/'
-  url 'http://www.harding.motd.ca/autossh/autossh-1.4c.tgz'
-  sha1 'd9a1d5a2987e7e5a444b00e63d6590936da1e1f2'
+  desc "Automatically restart SSH sessions and tunnels"
+  homepage "http://www.harding.motd.ca/autossh/"
+  url "http://www.harding.motd.ca/autossh/autossh-1.4e.tgz"
+  mirror "https://mirrorservice.org/sites/ftp.debian.org/debian/pool/main/a/autossh/autossh_1.4e.orig.tar.gz"
+  sha256 "9e8e10a59d7619176f4b986e256f776097a364d1be012781ea52e08d04679156"
 
-  def patches
-    DATA
+  bottle do
+    cellar :any_skip_relocation
+    revision 1
+    sha256 "9eb45f4246ed8db8cf639772bb252cedca944b480e7b8bedeeff4e96635a7a97" => :el_capitan
+    sha256 "5926ad9cc35738f1fc5eebc8dd68770a0cc62f8a1c5344cc01547c246821e7c1" => :yosemite
+    sha256 "4c86bc07f832f9ffeffc6542ecd102925fdebb363cfc354903cba2e9faa7900c" => :mavericks
   end
 
+  patch :DATA
+
   def install
-    system "./configure", "--disable-debug", "--disable-dependency-tracking",
-                          "--prefix=#{prefix}",
-                          "--mandir=#{man}"
-    system "make install"
-    bin.install 'rscreen'
+    system "./configure", "--prefix=#{prefix}", "--mandir=#{man}"
+    system "make", "install"
+    bin.install "rscreen"
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/autossh -V")
   end
 end
 

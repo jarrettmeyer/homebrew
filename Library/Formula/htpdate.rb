@@ -1,9 +1,8 @@
-require 'formula'
-
 class Htpdate < Formula
-  homepage 'http://www.clevervest.com/htp'
-  url 'http://www.clevervest.com/htp/archive/c/htpdate-0.9.1.tar.gz'
-  sha1 '0c8ca300491d12d0bbb3950c8b6c41ba5225c3fa'
+  desc "Synchronize time with remote web servers"
+  homepage "http://www.vervest.org/fiki/bin/view/HTP"
+  url "http://www.vervest.org/htp/archive/c/htpdate-0.9.1.tar.bz2"
+  sha256 "2afd132b00d33cd45eea9445387441174fe9bedf3fdf72c5a19f0051cf5a2446"
 
   def install
     system "make", "prefix=#{prefix}",
@@ -13,7 +12,7 @@ class Htpdate < Formula
                    "install"
   end
 
-  def test
+  test do
     system "#{bin}/htpdate", "-h"
   end
 end

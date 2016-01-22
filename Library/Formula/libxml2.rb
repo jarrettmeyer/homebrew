@@ -1,65 +1,76 @@
-require 'formula'
-
 class Libxml2 < Formula
-  homepage 'http://xmlsoft.org'
-  url 'ftp://xmlsoft.org/libxml2/libxml2-2.9.0.tar.gz'
-  mirror 'http://xmlsoft.org/sources/libxml2-2.9.0.tar.gz'
-  sha256 'ad25d91958b7212abdc12b9611cfb4dc4e5cddb6d1e9891532f48aacee422b82'
+  desc "GNOME XML library"
+  homepage "http://xmlsoft.org"
+  url "http://xmlsoft.org/sources/libxml2-2.9.3.tar.gz"
+  mirror "ftp://xmlsoft.org/libxml2/libxml2-2.9.3.tar.gz"
+  sha256 "4de9e31f46b44d34871c22f54bfc54398ef124d6f7cafb1f4a5958fbcd3ba12d"
+
+  bottle do
+    cellar :any
+    sha256 "543d5ad733130bca7640900cd04cce0d499d6eb858ec2d17a0cd49b428b4c8d1" => :el_capitan
+    sha256 "3df0a8327d236e67e77075f108702e444169321716c430380ef99f93f6d7bc32" => :yosemite
+    sha256 "87ec20eb4dc74d17f6fa1b9ef2f14bbf08449457e08fd061411c7504b609c2f0" => :mavericks
+  end
+
+  head do
+    url "https://git.gnome.org/browse/libxml2", :using => :git
+
+    depends_on "autoconf" => :build
+    depends_on "automake" => :build
+    depends_on "libtool" => :build
+  end
+
+  depends_on :python => :optional
 
   keg_only :provided_by_osx
 
   option :universal
-  option 'with-python', 'Compile the libxml2 Python 2.x modules'
 
   fails_with :llvm do
     build 2326
     cause "Undefined symbols when linking"
   end
 
-  def patches
-    %w{
-    http://git.gnome.org/browse/libxml2/patch/?id=3f6cfbd1d38d0634a2ddcb9a0a13e1b5a2195a5e
-    http://git.gnome.org/browse/libxml2/patch/?id=713434d2309da469d64b35e163ea6556dadccada
-    }
-  end
-
   def install
     ENV.universal_binary if build.universal?
+    if build.head?
+      inreplace "autogen.sh", "libtoolize", "glibtoolize"
+      system "./autogen.sh"
+    end
 
     system "./configure", "--disable-dependency-tracking",
                           "--prefix=#{prefix}",
-                          "--without-python"
+                          "--without-python",
+                          "--without-lzma"
     system "make"
     ENV.deparallelize
-    system "make install"
+    system "make", "install"
 
-    if build.include? 'with-python'
-      # Build Python bindings manually
-      cd 'python' do
-        python_lib = lib/which_python/'site-packages'
-        ENV.append 'PYTHONPATH', python_lib
-        python_lib.mkpath
-
-        archs = archs_for_command("python")
-        archs.remove_ppc!
-        arch_flags = archs.as_arch_flags
-
-        ENV.append 'CFLAGS', arch_flags
-        ENV.append 'LDFLAGS', arch_flags
-
-        unless MacOS::CLT.installed?
-          # We can hijack /opt/include to insert SDKROOT/usr/include
-          inreplace 'setup.py', '"/opt/include",', "'#{MacOS.sdk_path}/usr/include',"
-        end
-
-        system "python", "setup.py",
-                         "install_lib",
-                         "--install-dir=#{python_lib}"
+    if build.with? "python"
+      cd "python" do
+        # We need to insert our include dir first
+        inreplace "setup.py", "includes_dir = [", "includes_dir = ['#{include}', '#{MacOS.sdk_path}/usr/include',"
+        system "python", "setup.py", "install", "--prefix=#{prefix}"
       end
     end
   end
 
-  def which_python
-    "python" + `python -c 'import sys;print(sys.version[:3])'`.strip
+  test do
+    (testpath/"test.c").write <<-EOS.undent
+      #include <libxml/tree.h>
+
+      int main()
+      {
+        xmlDocPtr doc = xmlNewDoc(BAD_CAST "1.0");
+        xmlNodePtr root_node = xmlNewNode(NULL, BAD_CAST "root");
+        xmlDocSetRootElement(doc, root_node);
+        xmlFreeDoc(doc);
+        return 0;
+      }
+    EOS
+    args = `#{bin}/xml2-config --cflags --libs`.split
+    args += %w[test.c -o test]
+    system ENV.cc, *args
+    system "./test"
   end
 end

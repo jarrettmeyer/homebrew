@@ -1,33 +1,39 @@
-require 'formula'
-
 class Libnids < Formula
-  homepage 'http://libnids.sourceforge.net/'
-  url 'http://downloads.sourceforge.net/project/libnids/libnids/1.24/libnids-1.24.tar.gz'
-  sha1 '9a421df05cefdc4f5f7db95efc001b3c2b5249ce'
+  desc "Implements E-component of network intrusion detection system"
+  homepage "http://libnids.sourceforge.net/"
+  url "https://downloads.sourceforge.net/project/libnids/libnids/1.24/libnids-1.24.tar.gz"
+  sha256 "314b4793e0902fbf1fdb7fb659af37a3c1306ed1aad5d1c84de6c931b351d359"
 
-  option "disable-libnet", "Don't include code requiring libnet"
-  option "disable-libglib", "Don't use glib2 for multiprocessing support"
+  bottle do
+    cellar :any
+    revision 1
+    sha256 "a0375ba5851ffc54b89948d05d843102dbf33dbe8f8d77e46673a985df40ca4f" => :yosemite
+    sha256 "4ad0be7662127faff0e9103f678f9d3f277278de4cdc801e2ecdc40ad81e448a" => :mavericks
+    sha256 "e88e84cda8a3bad62118791243f4642572fa19b9656f30bcdda08c510fd6b366" => :mountain_lion
+  end
 
-  depends_on 'pkg-config' => :build
-  depends_on :automake
-  depends_on :libtool
-  depends_on 'libnet' unless build.include? "disable-libnet"
-  depends_on 'glib' unless build.include? "disable-libglib"
+  deprecated_option "disable-libnet" => "without-libnet"
+  deprecated_option "disable-libglib" => "without-glib"
+
+  depends_on "pkg-config" => :build
+  depends_on "autoconf" => :build
+  depends_on "automake" => :build
+  depends_on "libtool" => :build
+  depends_on "libnet" => :recommended
+  depends_on "glib" => :recommended
 
   # Patch fixes -soname and .so shared library issues. Unreported.
-  def patches
-    DATA
-  end
+  patch :DATA
 
   def install
     # autoreconf the old 2005 era code for sanity.
-    system 'autoreconf', '-ivf'
+    system "autoreconf", "-ivf"
     args = ["--prefix=#{prefix}", "--mandir=#{man}", "--enable-shared"]
-    args << "--disable-libnet" if build.include? "disable-libnet"
-    args << "--disable-libglib" if build.include? "disable-libglib"
+    args << "--disable-libnet" if build.without? "libnet"
+    args << "--disable-libglib" if build.without? "glib"
 
     system "./configure", *args
-    system "make install"
+    system "make", "install"
   end
 end
 

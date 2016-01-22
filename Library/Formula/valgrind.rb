@@ -1,39 +1,31 @@
-require 'formula'
-
 class Valgrind < Formula
-  homepage 'http://www.valgrind.org/'
+  desc "Dynamic analysis tools (memory, debug, profiling)"
+  homepage "http://www.valgrind.org/"
 
-  # Valgrind 3.7.0 drops support for OS X 10.5
-  if MacOS.version >= 10.6
-    url 'http://valgrind.org/downloads/valgrind-3.8.1.tar.bz2'
-    sha1 'aa7a3b0b9903f59a11ae518874852e8ccb12751c'
-  else
-    url "http://valgrind.org/downloads/valgrind-3.6.1.tar.bz2"
-    sha1 "6116ddca2708f56e0a2851bdfbe88e01906fa300"
+  stable do
+    url "http://valgrind.org/downloads/valgrind-3.11.0.tar.bz2"
+    sha256 "6c396271a8c1ddd5a6fb9abe714ea1e8a86fce85b30ab26b4266aeb4c2413b42"
   end
 
-  head 'svn://svn.valgrind.org/valgrind/trunk'
-
-  if build.head?
-    depends_on :autoconf
-    depends_on :automake
-    depends_on :libtool
+  bottle do
+    sha256 "c747fd1c9b09ac4bc186bf5294317cd506ce1fd733b892b7df19c68e39505670" => :el_capitan
+    sha256 "d2200eebec692898c5684a837cf96832fbd877cc92ec57d1e9730e454a9e94c5" => :yosemite
+    sha256 "6bb14866f48391c2d1f44f7acd2c6fd709221f890147608b176ccfa49198a251" => :mavericks
   end
+
+  head do
+    url "svn://svn.valgrind.org/valgrind/trunk"
+
+    depends_on "autoconf" => :build
+    depends_on "automake" => :build
+    depends_on "libtool" => :build
+  end
+
+  depends_on :macos => :snow_leopard
 
   # Valgrind needs vcpreload_core-*-darwin.so to have execute permissions.
   # See #2150 for more information.
-  skip_clean 'lib/valgrind'
-
-  def patches
-    # 1: For Xcode-only systems, we have to patch hard-coded paths, use xcrun &
-    #    add missing CFLAGS. See: https://bugs.kde.org/show_bug.cgi?id=295084
-    # 2: Fix for 10.7.4 w/XCode-4.5, duplicate symbols. Reported upstream in
-    #    https://bugs.kde.org/show_bug.cgi?id=307415
-    p = []
-    p << 'https://gist.github.com/raw/3784836/f046191e72445a2fc8491cb6aeeabe84517687d9/patch1.diff' unless MacOS::CLT.installed?
-    p << 'https://gist.github.com/raw/3784930/dc8473c0ac5274f6b7d2eb23ce53d16bd0e2993a/patch2.diff' if MacOS.version == :lion
-    return p.empty? ? nil : p
-  end
+  skip_clean "lib/valgrind"
 
   def install
     args = %W[
@@ -47,12 +39,18 @@ class Valgrind < Formula
     end
 
     system "./autogen.sh" if build.head?
+
+    # Look for headers in the SDK on Xcode-only systems: https://bugs.kde.org/show_bug.cgi?id=295084
+    unless MacOS::CLT.installed?
+      inreplace "coregrind/Makefile.in", %r{(\s)(?=/usr/include/mach/)}, '\1'+MacOS.sdk_path.to_s
+    end
+
     system "./configure", *args
-    system 'make'
-    system "make install"
+    system "make"
+    system "make", "install"
   end
 
-  def test
+  test do
     system "#{bin}/valgrind", "ls", "-l"
   end
 end

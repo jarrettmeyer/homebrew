@@ -1,55 +1,49 @@
-require 'formula'
-
 class Opensc < Formula
-  homepage 'https://github.com/OpenSC/OpenSC/wiki'
-  url 'http://sourceforge.net/projects/opensc/files/OpenSC/opensc-0.13.0/opensc-0.13.0.tar.gz'
-  sha1 '9285ccbed7b49f63e488c8fb1b3e102994a28218'
-  head 'https://github.com/OpenSC/OpenSC.git'
+  desc "Tools and libraries for smart cards"
+  homepage "https://github.com/OpenSC/OpenSC/wiki"
+  head "https://github.com/OpenSC/OpenSC.git"
 
-  if build.head?
-    depends_on :automake
-    depends_on :libtool
+  stable do
+    url "https://downloads.sourceforge.net/project/opensc/OpenSC/opensc-0.15.0/opensc-0.15.0.tar.gz"
+    sha256 "399b2107a69e3f67e4e76dc2dbd951dbced8e534b1e0f919e176aea9b85970d7"
+
+    patch :p1 do
+      url "https://github.com/carlhoerberg/OpenSC/commit/e5ae77cae32fdcc7a23d6bd0013c2fd115a43591.diff"
+      sha256 "18bd9b6220bfc03768c6a7f5324e7f3981eff0bc8b8f7eb0f5159508b43d6863"
+    end
   end
 
-  option 'with-man-pages', 'Build manual pages'
+  bottle do
+    revision 1
+    sha256 "3c68218181dc025c0a2784ef1fa15834cdd890493b7603da86b6f1a4d2f90e5c" => :el_capitan
+    sha256 "12298b0c9b6cf85d37f861962f2dd719ad51b5f4485338acf17985e2e18d334a" => :yosemite
+    sha256 "08501fbffbb7f534ac5319104f7eb05243209897c6b958b10fc62024cf4a0f50" => :mavericks
+  end
 
-  depends_on 'docbook' if build.include? 'with-man-pages'
+  option "without-man-pages", "Skip building manual pages"
+
+  depends_on "autoconf" => :build
+  depends_on "automake" => :build
+  depends_on "libtool" => :build
+  depends_on "pkg-config" => :build
+  depends_on "docbook-xsl" => :build if build.with? "man-pages"
+  depends_on "openssl"
 
   def install
-    extra_args = []
+    args = %W[
+      --disable-dependency-tracking
+      --prefix=#{prefix}
+      --enable-sm
+      --enable-openssl
+      --enable-pcsc
+    ]
 
-    # If OpenSC's configure script detects docbook it will build manual
-    # pages. This extends the spirit of that logic to support homebrew
-    # installed docbook.
-    docbook = Formula.factory 'docbook'
-    if docbook.installed?
-      # Docbookxsl is a Formula defined in docbook.rb. Formula.factory
-      # for 'docbook' will cause 'docbook.rb' to be required, which
-      # makes Docbookxsl available. It would be nice if this didn't
-      # depend on internal implementation details of the docbook
-      # formula.
-      docbookxsl = Docbookxsl.new
-
-      # OpenSC looks in a set of common paths for docbook's xsl files,
-      # but not in /usr/local, and certainly not in homebrew's
-      # cellar. This specifies the correct homebrew path.
-      extra_args << "--with-xsl-stylesheetsdir=" +
-        docbook.prefix/docbookxsl.catalog
+    if build.with? "man-pages"
+      args << "--with-xsl-stylesheetsdir=#{Formula["docbook-xsl"].opt_prefix}/docbook-xsl"
     end
 
-    system "./bootstrap" if build.head?
-    system "./configure", "--disable-dependency-tracking",
-                          "--prefix=#{prefix}",
-                          "--enable-sm",
-                          "--enable-openssl",
-                          "--enable-pcsc",
-                          *extra_args
-
-    system "make install"
-  end
-
-  def caveats; <<-EOS.undent
-    Manual pages will be installed if docbook is installed.
-    EOS
+    system "./bootstrap"
+    system "./configure", *args
+    system "make", "install"
   end
 end

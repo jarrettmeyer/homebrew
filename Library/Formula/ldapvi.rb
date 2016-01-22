@@ -1,28 +1,39 @@
-require 'formula'
-
 class Ldapvi < Formula
-  homepage 'http://www.lichteblau.com/ldapvi/'
-  url 'http://www.lichteblau.com/download/ldapvi-1.7.tar.gz'
-  sha1 'd1cde4cbb618180f9ae0e77c56a1520b8ad61c9a'
+  desc "Update LDAP entries with a text editor"
+  homepage "http://www.lichteblau.com/ldapvi/"
+  url "http://www.lichteblau.com/download/ldapvi-1.7.tar.gz"
+  mirror "https://mirrors.kernel.org/debian/pool/main/l/ldapvi/ldapvi_1.7.orig.tar.gz"
+  sha256 "6f62e92d20ff2ac0d06125024a914b8622e5b8a0a0c2d390bf3e7990cbd2e153"
+  bottle do
+    cellar :any
+    sha256 "bd3f055256d05adb1e88e9641c57b4b01be37677f7991699606c2cee6af52f2f" => :yosemite
+    sha256 "ae6758ad1cb44a31377015f015c5c20626fb1bedbf90dfd33efdcd85447bb183" => :mavericks
+    sha256 "b26d6f88dad7109ac4b5cb48005366a0b103c8f6851e765f7797b187aaafd58b" => :mountain_lion
+  end
 
-  depends_on 'pkg-config' => :build
-  depends_on 'gettext'
-  depends_on 'glib'
-  depends_on 'popt'
-  depends_on 'readline'
+  revision 1
+
+  depends_on "pkg-config" => :build
+  depends_on "gettext"
+  depends_on "glib"
+  depends_on "popt"
+  depends_on "readline"
+  depends_on "openssl"
 
   # Backporting the fix from the devel version
   # (namespace conflict with Lion's getline function)
   # http://www.lichteblau.com/git/?p=ldapvi.git;a=commit;h=256ced029c235687bfafdffd07be7d47bf7af39b
   # Also fix compilation with clang by changing `return` to `return 0`.
-  def patches
-    DATA
-  end
+  patch :DATA
 
   def install
     system "./configure", "--disable-dependency-tracking",
                           "--prefix=#{prefix}"
-    system "make install"
+    system "make", "install"
+  end
+
+  test do
+    system "#{bin}/ldapvi", "--version"
   end
 end
 
